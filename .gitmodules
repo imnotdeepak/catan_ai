@@ -1,0 +1,3 @@
+[submodule "vendor/catanatron"]
+	path = vendor/catanatron
+	url = https://github.com/bcollazo/catanatron.git
