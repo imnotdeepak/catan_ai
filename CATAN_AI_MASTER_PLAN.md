@@ -712,8 +712,8 @@ Each task should become a GitHub issue with an owner, acceptance tests and a rep
 - [x] **ENG-004:** Implement action adapter with exhaustive legal-mask/offer-affordability tests (`src/catan_ai/engine/`).
 - [x] **ENG-005:** Implement full truth referee event log + strictly filtered per-player observations (`src/catan_ai/observations/`, `docs/observation-contract.md`).
 - [x] **ENG-006:** Write hidden-state indistinguishability and private-card leak tests (`tests/observations/`).
-- [ ] **ENG-007:** Verify independent branch RNG and non-perturbation of real-game future rolls.
-- [ ] **ENG-008:** Build deterministic four-player arena with seat rotation, JSON results and replay.
+- [x] **ENG-007:** Verify independent branch RNG and non-perturbation of real-game future rolls (`EngineAdapter.branch`).
+- [x] **ENG-008:** Build deterministic four-player arena with seat rotation, JSON results and replay (`src/catan_ai/arena/`, `python -m catan_ai.cli.arena`).
 - [ ] **ENG-009:** Throughput benchmark: games/sec for each built-in bot, decisions/sec, `Game.copy()` cost, firewall overhead → `reports/throughput.md`; derive search/rollout budget defaults in `configs/`.
 - [ ] **ENG-010:** Domestic-trade audit: available trade actions, whether built-in bots trade, missing lifecycle pieces, patch-scope estimate and go/no-go for Release 0.4 → `docs/trade-audit.md`.
 - [ ] **ENG-011:** Reference ladder: four-player seat-rotated matches across Random, WeightedRandom, VictoryPoint, ValueFunction, GreedyPlayouts, MCTS and AlphaBeta; mark privileged bots; report truncation separately → `reports/ladder.md`.

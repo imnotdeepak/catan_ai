@@ -17,6 +17,7 @@ from catanatron.models.board import STATIC_GRAPH
 from catanatron.models.enums import WOOD
 from catanatron.state_functions import get_player_freqdeck
 
+from catan_ai.engine import EngineAdapter
 from tests.rules.helpers import force_turn, new_game, past_setup, set_hand
 
 
@@ -24,12 +25,14 @@ def deviation(row: str, reason: str) -> pytest.MarkDecorator:
     return pytest.mark.xfail(strict=True, reason=f"{row}: {reason}")
 
 
-@deviation("D-01", "Game.copy() shares the RNG object with the original")
-def test_d01_copy_does_not_perturb_original_rng() -> None:
-    game = new_game(7)
-    before = game.random.getstate()
-    game.copy().play()
-    assert game.random.getstate() == before
+def test_d01_branches_do_not_perturb_original_rng() -> None:
+    """Fixed in the adapter (EngineAdapter.branch), not in the engine; see test_branching."""
+    adapter = EngineAdapter.new_game(7)
+    before = adapter.referee_game.random.getstate()
+    branch = adapter.branch(1)
+    while not branch.is_over:
+        branch.execute(branch.legal_actions()[0])
+    assert adapter.referee_game.random.getstate() == before
 
 
 def test_d02_only_active_player_can_win() -> None:

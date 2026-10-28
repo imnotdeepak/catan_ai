@@ -6,12 +6,14 @@ agent at a real decision (master plan §2.1). Agents receive observations from
 the observation firewall instead (ENG-005).
 """
 
+import random
 from collections.abc import Sequence
 from typing import Any
 
 from catanatron import Color, Game
 from catanatron.game import TURNS_LIMIT, is_valid_action
 from catanatron.models.actions import generate_playable_actions
+from catanatron.models.enums import ActionRecord
 from catanatron.models.player import SimplePlayer
 
 from catan_ai.engine.actions import (
@@ -129,15 +131,37 @@ class EngineAdapter:
             return False
         return bool(is_valid_action(self._game.playable_actions, self._game.state, engine_action))
 
-    def execute(self, action: CanonicalAction) -> Any:
+    def execute(self, action: CanonicalAction, forced_outcome: Any = None) -> Any:
         """Apply a legal action, or raise IllegalActionError without changing state.
 
         Returns the engine's random outcome, if any (privileged): dice for ROLL,
         the card drawn for BUY_DEV_CARD, the resource stolen for MOVE_ROBBER.
+        `forced_outcome` replays a recorded outcome instead of drawing one.
         """
         if not self.is_legal(action):
             raise IllegalActionError(f"Illegal action: {action.key}")
-        return self._game.execute(self._to_engine(action)).result
+        engine_action = self._to_engine(action)
+        record = None if forced_outcome is None else ActionRecord(engine_action, forced_outcome)
+        return self._game.execute(engine_action, action_record=record).result
+
+    def branch(self, seed: int) -> "EngineAdapter":
+        """An independent copy for simulation and search (ENG-007, plan §10.2).
+
+        Catanatron's `Game.copy()` shares the RNG with the original (rules
+        matrix D-01), so simulating a copy would change the real game's future
+        and would replay its true dice. A branch instead gets its own RNG seeded
+        by `seed`, and its dev deck is reshuffled, so it neither perturbs the
+        real game nor knows its future rolls or draws. Never call
+        `Game.copy()` directly.
+
+        A branch of the referee still holds the true hands; search over hidden
+        information must branch from sampled belief worlds instead (plan §10.1).
+        """
+        game = self._game.copy()
+        rng = random.Random(seed)
+        game.random = game.state.random = rng
+        rng.shuffle(game.state.development_listdeck)
+        return EngineAdapter(game)
 
     def engine_player_decision(self) -> CanonicalAction:
         """Ask the seated Catanatron bot to decide (privileged: it sees the full game)."""

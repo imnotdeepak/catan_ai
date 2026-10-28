@@ -114,11 +114,12 @@ class Referee:
 
     # ----- Play
 
-    def execute(self, action: CanonicalAction) -> None:
+    def execute(self, action: CanonicalAction, forced_outcome: Any = None) -> None:
+        """Apply an action and record its events. `forced_outcome` is for replays."""
         state = self._adapter.referee_game.state
         turn_index = self._adapter.num_turns
         before = snapshot(state)
-        outcome = self._adapter.execute(action)
+        outcome = self._adapter.execute(action, forced_outcome)
         after = snapshot(state)
 
         self._record(action_event(len(self._events), turn_index, action, outcome, before, after))
