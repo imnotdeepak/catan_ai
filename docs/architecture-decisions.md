@@ -106,7 +106,7 @@ D-01 (shared RNG on copy) stays in the adapter (ENG-007): upstream shares the RN
 
 **Upstream test baseline (Windows, core suite):** 248 pass. `tests/test_stdio_bot.py` (12 tests) fails at the unmodified upstream commit too, because shell-style splitting strips Windows path backslashes; gym, web and ML suites need extras not installed. Run with `--basetemp` inside the scratch area to avoid a temp-dir permission error.
 
-**Consequences:** upgrading Catanatron means rebasing `catan-ai-fixes` onto a newer upstream commit and re-running both test suites. Offering the four commits upstream as pull requests is a follow-up; if merged, the submodule can return to upstream.
+**Consequences:** upgrading Catanatron means rebasing `catan-ai-fixes` onto a newer upstream commit and re-running both test suites. The fixes are offered upstream as bcollazo/catanatron #395 (bank shortage), #396 (Longest Road after a cut), #397 (trade responses), #398 (only the active player wins), #399 (AlphaBeta with trade actions) and #400 (reproducible seeded games), opened 2026-10-28. If all are merged, the submodule can return to upstream.
 
 ---
 
