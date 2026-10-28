@@ -1,9 +1,10 @@
-"""Confirmed deviations of the pinned engine from the 2025 (6th edition) rules.
+"""Deviations of upstream Catanatron from the 2025 (6th edition) rules.
 
-Each test asserts the *correct* rule and is marked strict xfail. When the engine
-or adapter is patched, the test starts passing, strict xfail turns that into a
-failure, and the marker and docs/rules-matrix.md row must be updated together.
-Row IDs (D-xx) refer to docs/rules-matrix.md.
+Each test asserts the *correct* rule. Deviations fixed in our fork
+(imnotdeepak/catanatron, branch catan-ai-fixes) are plain regression tests.
+Open deviations are marked strict xfail: once patched, the test passes, strict
+xfail turns that into a failure, and the marker and docs/rules-matrix.md row
+must be updated together. Row IDs (D-xx) refer to docs/rules-matrix.md.
 """
 
 from itertools import pairwise
@@ -31,7 +32,6 @@ def test_d01_copy_does_not_perturb_original_rng() -> None:
     assert game.random.getstate() == before
 
 
-@deviation("D-02", "win is checked for every player after every action")
 def test_d02_only_active_player_can_win() -> None:
     game = past_setup(8)
     state = game.state
@@ -40,7 +40,6 @@ def test_d02_only_active_player_can_win() -> None:
     assert game.winning_color() is None
 
 
-@deviation("D-03", "no single-affected-player exception on bank shortage")
 def test_d03_bank_shortage_single_player_gets_remainder() -> None:
     board = new_game(4).state.board
     tile = next(t for t in board.map.land_tiles.values() if t.resource == WOOD)
@@ -82,7 +81,6 @@ def _route_cut_geometry(land: set[int]) -> tuple[list[int], int, int]:
     raise AssertionError("no geometry found")
 
 
-@deviation("D-04", "after a cut, Longest Route goes to max length even below 5")
 def test_d04_longest_route_returns_to_supply_when_no_route_of_five() -> None:
     board = new_game(5).state.board
     path, m, k = _route_cut_geometry(set(board.map.land_nodes))
@@ -97,7 +95,6 @@ def test_d04_longest_route_returns_to_supply_when_no_route_of_five() -> None:
     assert board.road_color is None
 
 
-@deviation("D-06", "response loop does not skip the offering player")
 def test_d06_offerer_is_not_asked_to_respond_to_own_offer() -> None:
     game = past_setup(2)
     force_turn(game, 2)
@@ -112,7 +109,6 @@ def test_d06_offerer_is_not_asked_to_respond_to_own_offer() -> None:
     assert offerer not in asked
 
 
-@deviation("D-07", "offerer affordability is checked neither at offer nor at confirm")
 def test_d07_offerer_cannot_trade_cards_it_does_not_hold() -> None:
     game = past_setup(3)
     force_turn(game, 0)
@@ -131,3 +127,20 @@ def test_d07_offerer_cannot_trade_cards_it_does_not_hold() -> None:
     except ValueError:
         return  # rejected somewhere in the lifecycle: correct behavior
     assert min(get_player_freqdeck(state, offerer)) >= 0
+
+
+@pytest.mark.parametrize(
+    ("lengths", "expected"),
+    [
+        ({Color.RED: 4, Color.BLUE: 6, Color.WHITE: 6}, (None, 6)),  # tie among others: supply
+        ({Color.RED: 6, Color.BLUE: 6}, (Color.RED, 6)),  # holder tied: keeps it (Q-01)
+        ({Color.RED: 4, Color.BLUE: 6}, (Color.BLUE, 6)),  # single longest takes it
+    ],
+)
+def test_d05_longest_route_ties_after_cut(
+    lengths: dict[Any, int], expected: tuple[Any, int]
+) -> None:
+    board = new_game(5).state.board
+    board.road_color, board.road_length = Color.RED, 6
+    board.road_lengths.update(lengths)
+    assert board._holder_after_cut() == expected

@@ -1,3 +1,4 @@
 [submodule "vendor/catanatron"]
 	path = vendor/catanatron
-	url = https://github.com/bcollazo/catanatron.git
+	url = https://github.com/imnotdeepak/catanatron.git
+	branch = catan-ai-fixes

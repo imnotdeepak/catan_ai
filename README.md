@@ -33,5 +33,5 @@ uv run pytest
 |---|---|
 | `src/catan_ai/` | Project package |
 | `tests/` | Test suite |
-| `vendor/catanatron/` | Pinned Catanatron engine (git submodule, GPL-3.0-or-later) |
+| `vendor/catanatron/` | Catanatron engine: our fork with rule fixes, pinned as a git submodule (GPL-3.0-or-later; see ADR-005) |
 | `docs/` | Rules matrix, audits, decision log |

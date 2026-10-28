@@ -11,9 +11,9 @@ Each entry records date, context, decision, alternatives and evidence (master pl
 
 **Context:** The project folder sat inside an unrelated parent repository (`Documents/Coding`). The engine must be pinned to an exact commit (§1.3), and any engine patches must be isolated (§1.3 go/no-go).
 
-**Decision:** `catan/` is its own GitHub repository, https://github.com/imnotdeepak/catan_ai. Catanatron is a git submodule at `vendor/catanatron`, installed as an editable path dependency through uv.
+**Decision:** `catan/` is its own GitHub repository, https://github.com/imnotdeepak/catan_ai. Catanatron is a git submodule at `vendor/catanatron`, installed as an editable path dependency through uv. (Amended by ADR-005: the submodule now tracks the fork, with the upstream commit below as its base.)
 
-**Pinned engine:**
+**Pinned upstream base:**
 
 | Field | Value |
 |---|---|
@@ -75,6 +75,36 @@ Only the core package is installed. The `gym` extra (gymnasium<=0.29.1, numpy, p
 **Decision:** The baseline is the 2025 6th edition. There is no separate migration target. Deviations are patched behind the engine adapter or in a minimal fork, each guarded by a strict-xfail test that flips when fixed.
 
 **Consequences:** Terminology follows the 6th edition where it differs (Longest Route, Invention), while code keeps Catanatron's names (`ROAD`, `YEAR_OF_PLENTY`).
+
+---
+
+## ADR-005: Patch engine rule deviations in a fork
+
+**Date:** 2026-10-28  
+**Status:** Accepted (amends ADR-001: the submodule now tracks the fork)
+
+**Context:** ENG-003 found rule deviations inside engine internals (`yield_resources`, `Board` Longest Road logic, the trade response loop) that an outside adapter cannot fix cleanly.
+
+**Options considered:**
+
+- **Fork (chosen):** fixes are ordinary, reviewable commits; the engine is correct for every entry point (built-in bots, `catanatron-play`, our adapter); rebasing onto upstream surfaces conflicts explicitly; fixes can be offered upstream.
+- **Runtime monkeypatching:** no second repository, but fixes are invisible in the engine source, entry points that skip our package get the bugs back, and upstream refactors can silently stop a patch applying.
+- **Upstream only, wait for merge:** no maintenance, but benchmarks would run on wrong rules until merged, which §1.3 forbids.
+
+**Decision:** The submodule points at https://github.com/imnotdeepak/catanatron, branch `catan-ai-fixes`. The `upstream` remote in the submodule is https://github.com/bcollazo/catanatron. Each fix is one commit with tests, and the upstream test suite must pass at every commit.
+
+| Fork commit | Fix | Matrix row |
+|---|---|---|
+| `a36ac1d` | Single affected player takes the remaining supply on shortage | D-03 |
+| `adbb0ed` | Longest Road after a cut: ≥5, unique leader or holder, else supply; VP removed on return | D-04, D-05 |
+| `8e44f47` | Offerer not asked about its own offer; affordability checked at offer and confirm | D-06, D-07 |
+| `d252ad8` | Only the active player can win | D-02 |
+
+D-01 (shared RNG on copy) stays in the adapter (ENG-007): upstream shares the RNG deliberately, and changing it would alter its search bots' behavior.
+
+**Upstream test baseline (Windows, core suite):** 248 pass. `tests/test_stdio_bot.py` (12 tests) fails at the unmodified upstream commit too, because shell-style splitting strips Windows path backslashes; gym, web and ML suites need extras not installed. Run with `--basetemp` inside the scratch area to avoid a temp-dir permission error.
+
+**Consequences:** upgrading Catanatron means rebasing `catan-ai-fixes` onto a newer upstream commit and re-running both test suites. Offering the four commits upstream as pull requests is a follow-up; if merged, the submodule can return to upstream.
 
 ---
 
