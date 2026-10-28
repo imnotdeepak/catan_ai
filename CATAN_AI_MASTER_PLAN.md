@@ -716,7 +716,7 @@ Each task should become a GitHub issue with an owner, acceptance tests and a rep
 - [x] **ENG-008:** Build deterministic four-player arena with seat rotation, JSON results and replay (`src/catan_ai/arena/`, `python -m catan_ai.cli.arena`).
 - [x] **ENG-009:** Throughput benchmark: games/sec for each built-in bot, decisions/sec, `Game.copy()` cost, firewall overhead → `reports/throughput.md`; derive search/rollout budget defaults in `configs/`.
 - [x] **ENG-010:** Domestic-trade audit: available trade actions, whether built-in bots trade, missing lifecycle pieces, patch-scope estimate and go/no-go for Release 0.4 → `docs/trade-audit.md`.
-- [ ] **ENG-011:** Reference ladder: four-player seat-rotated matches across Random, WeightedRandom, VictoryPoint, ValueFunction, GreedyPlayouts, MCTS and AlphaBeta; mark privileged bots; report truncation separately → `reports/ladder.md`.
+- [x] **ENG-011:** Reference ladder: four-player seat-rotated matches across Random, WeightedRandom, VictoryPoint, ValueFunction, GreedyPlayouts, MCTS and AlphaBeta; mark privileged bots; report truncation separately → `reports/ladder.md`.
 
 ### P1 — Release 0.2: learning baseline
 

@@ -108,7 +108,8 @@ def main(argv: list[str] | None = None) -> int:
         "",
     ]
     args.report.parent.mkdir(parents=True, exist_ok=True)
-    args.report.write_text("\n".join(header) + "\n\n".join(sections) + "\n", encoding="utf-8")
+    body = "\n".join(header) + "\n" + "\n\n".join(sections) + "\n"
+    args.report.write_text(body, encoding="utf-8")
     print(f"wrote {args.report}")
     return 0
 

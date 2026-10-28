@@ -4,7 +4,7 @@ Research AI for **standard four-player base Catan**, built on a pinned [Catanatr
 
 The design, release plan and backlog live in [CATAN_AI_MASTER_PLAN.md](CATAN_AI_MASTER_PLAN.md). Decisions are logged in [docs/architecture-decisions.md](docs/architecture-decisions.md).
 
-**Status:** Release 0.1 (Rules + Arena) in progress. No agent, model or results yet.
+**Status:** Release 0.1 (Rules + Arena) complete: rules-audited engine fork, observation firewall, seat-rotated arena with exact replay, throughput benchmark, trade audit and reference ladder. Next: Release 0.2 (learning baseline). No learned agent yet.
 
 ## Setup
 

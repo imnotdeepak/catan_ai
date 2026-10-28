@@ -141,6 +141,6 @@ Training and arena runs use the firewalled path; only search internals may use t
 
 | Release | Started | Timebox | Status |
 |---|---|---|---|
-| 0.1 Rules + Arena | 2026-10-28 | 6 weeks, target 2026-12-09; cut to exit gate if unfinished by 2026-12-30 (+50%) | In progress |
+| 0.1 Rules + Arena | 2026-10-28 | 6 weeks, target 2026-12-09; cut to exit gate if unfinished by 2026-12-30 (+50%) | **Complete 2026-10-28**: exit gate passed (`reports/baseline_report.md`), ladder in `reports/ladder.md` |
 
 Release 0.1 timebox assumes roughly 10–15 hours/week. Estimate by task: ENG-003 3–4 days; ENG-004 ~1 week; ENG-005/006 1.5–2 weeks; ENG-007 1–2 days; ENG-008 3–5 days; ENG-009 1–2 days; ENG-010 2–3 days; ENG-011 1–2 days.
