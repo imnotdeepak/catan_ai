@@ -14,7 +14,7 @@
 2. **Reference ladder:** Catanatron's built-in bots (up to `AlphaBetaPlayer`) are now mandatory reference opponents. Bots that read the full game state are labeled **privileged** in every report.
 3. **Throughput gate:** simulator speed (games/sec, decisions/sec, clone cost) is measured in Release 0.1. All search and rollout budgets in this plan are placeholders until then.
 4. **Trade audit:** Catanatron's domestic-trade lifecycle is audited in Release 0.1, with an explicit patch-scope estimate and go/no-go for the trading release.
-5. **Rules edition:** the baseline rule set is the official edition Catanatron's pinned commit most closely implements. The 2025 edition becomes a tracked migration target rather than a day-one requirement.
+5. **Rules edition:** the baseline rule set is the official edition Catanatron's pinned commit most closely implements. ENG-003 found that to be the 2025 6th edition (ADR-004).
 6. **Beliefs:** exact accounting plus enumerated hypotheses comes first. Particle filtering is a fallback for when enumeration exceeds its budget.
 7. **Opponent Intelligence:** expanded with an interface, model progression, consumers and tests (§7).
 8. **Process:** tiered definition of done, release timeboxes, renumbered backlog, Windows/PowerShell bootstrap commands.
@@ -28,7 +28,7 @@ These decisions carry forward the project discussions and are **locked unless a 
 
 | Area | Decision |
 |---|---|
-| Rules | Exactly four players; standard base Catan; target **10 VP**; no house rules, expansions, friendly robber, or other optional rules. Pin the official edition Catanatron most closely implements and validate every engine behavior against it; 2025 edition is a tracked migration target (§1.1). |
+| Rules | Exactly four players; standard base Catan; target **10 VP**; no house rules, expansions, friendly robber, or other optional rules. Pinned to the **2025 6th edition**, which Catanatron's turn structure matches; every engine behavior is validated against it (§1.1, `docs/rules-matrix.md`). |
 | Engine | Catanatron, wrapped rather than trusted as an infallible rules/visibility reference. |
 | Opening | **Opening Strategy Engine 2.0**: all six named archetypes as *priors*, legal settlement/road pair evaluation, opponent-aware snake-draft search, full-game outcome testing. |
 | Victory planning | **Victory Path Planner 2.0**: AND/OR dependencies, multiple contingent routes to 10 VP, opponent win threats, and defensive actions. |
@@ -54,9 +54,9 @@ These decisions carry forward the project discussions and are **locked unless a 
 
 **Out:** Seafarers, Cities & Knights, 5–6-player extensions, beginner protection/friendly robber, house variants, cheating, privileged opponent-hand access, automated play on third-party platforms without authorization, unrestricted conversational negotiation or partnership promises that cannot be completed under standard rules.
 
-**Rules-version decision:** The **baseline rule set** is the official base-game edition whose rules Catanatron's pinned commit most closely implements. Identify it in ENG-003 (expect the pre-2025 rules; confirm, don't assume) and link its rulebook in the rule audit. Record every engine deviation from that edition in `docs/rules-matrix.md`, and patch the ones that affect play.
+**Rules-version decision:** The **baseline rule set** is the official base-game edition whose rules Catanatron's pinned commit most closely implements.
 
-The official **2025 base-game edition** is a **tracked migration target**. The rules matrix carries a separate column listing each 2025 difference. Adopt 2025 only through an ADR after Release 0.1, and only if the differences matter for play. Earlier editions document separate trade/build phases while later play combines them, so confirm the action-order semantics in the pinned version before training. Never mix editions within a benchmark. “No optional rules” means rules from the selected edition, not a blend of old defaults and newer tournament customs.
+**Resolved in ENG-003 (2026-10-28, ADR-004):** the baseline is the **2025 6th edition** (rulebook CN3081 v6.250401). Catanatron's turn structure matches it: one Action phase with trades and builds in any order, and dev cards playable before rolling. Earlier editions documented separate trade/build phases. Engine deviations from the 6th edition are listed and tested in `docs/rules-matrix.md`; patch the ones that affect play. Never mix editions within a benchmark. “No optional rules” means rules from the selected edition, not a blend of old defaults and newer tournament customs.
 
 ### 1.2 Canonical mechanics to test
 
@@ -706,9 +706,9 @@ Each task should become a GitHub issue with an owner, acceptance tests and a rep
 
 ### P0 — Release 0.1: foundation (before any neural training)
 
-- [ ] **ENG-001:** Initialize `catan/` as a standalone GitHub repository (§12), Python environment (3.11+), project config, formatter, type checking, pytest and CI.
-- [ ] **ENG-002:** Add Catanatron as a git submodule at `vendor/catanatron` and **pin** its commit; record Python/dependency versions and license.
-- [ ] **ENG-003:** Create `docs/rules-matrix.md`; identify the edition Catanatron implements, verify all mechanics in §1, and add the 2025-edition difference column.
+- [x] **ENG-001:** Initialize `catan/` as a standalone GitHub repository (§12), Python environment (3.11+), project config, formatter, type checking, pytest and CI.
+- [x] **ENG-002:** Add Catanatron as a git submodule at `vendor/catanatron` and **pin** its commit; record Python/dependency versions and license.
+- [x] **ENG-003:** Create `docs/rules-matrix.md`; identify the edition Catanatron implements and verify all mechanics in §1. Patches for its deviations land in ENG-004 (adapter) and ENG-007 (RNG).
 - [ ] **ENG-004:** Implement action adapter with exhaustive legal-mask/offer-affordability tests.
 - [ ] **ENG-005:** Implement full truth referee event log + strictly filtered per-player observations.
 - [ ] **ENG-006:** Write hidden-state indistinguishability and private-card leak tests.
@@ -817,7 +817,7 @@ Don't start PPO until the rules audit, deterministic replays, and observation-co
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Engine deviates from chosen rules edition | Entire training distribution wrong | Baseline edition chosen to match the engine; rule matrix, unit tests, minimal fork/adapter; 2025 migration only via ADR |
+| Engine deviates from chosen rules edition | Entire training distribution wrong | Baseline edition (2025 6th) chosen to match the engine; rule matrix with strict-xfail deviation tests; minimal fork/adapter |
 | Built-in reference bots read full game state | Ladder results overstate fair-play opponent strength or get misreported | Label privileged bots in every report; optional firewalled variants on belief-sampled worlds |
 | Domestic trading needs substantial engine work | Release 0.4 slips or trading is quietly simplified | ENG-010 audit with patch-scope estimate and go/no-go in 0.1; any bank/port-only benchmark explicitly labeled non-standard |
 | Scope exceeds available capacity | Program never reaches a playable agent | Timeboxed releases (§13.1), learned baseline in 0.2, specialists kept only on ablation evidence |
@@ -843,7 +843,7 @@ Do not tune hyperparameters against final holdout. Register each experiment with
 
 ## 17. Deliverables to create during implementation
 
-1. `docs/rules-matrix.md` — canonical mechanic tests, edition and engine discrepancies, 2025-edition difference column.
+1. `docs/rules-matrix.md` — canonical mechanic tests, edition choice, engine deviations and open interpretation questions.
 2. `docs/trade-audit.md` — domestic-trade lifecycle findings, patch scope and go/no-go.
 3. `docs/observation-contract.md` — exact public/own-private field semantics and redaction tests.
 4. `docs/experiment-protocol.md` — seed partitioning, opponent pools, metrics and confidence intervals.

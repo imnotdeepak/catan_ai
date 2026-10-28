@@ -63,6 +63,21 @@ Only the core package is installed. The `gym` extra (gymnasium<=0.29.1, numpy, p
 
 ---
 
+## ADR-004: Baseline rules edition is the 2025 6th edition
+
+**Date:** 2026-10-28  
+**Status:** Accepted (supersedes the plan's provisional "expect pre-2025 rules")
+
+**Context:** The plan (§1.1) said to pin whichever official edition Catanatron most closely implements, to be identified in ENG-003.
+
+**Evidence:** Catanatron allows trading and building in any order within one phase after rolling, and allows dev cards before rolling. That matches the 2025 6th-edition rulebook (CN3081 v6.250401, p.6–7), which defines a single Action phase. The plan notes earlier editions documented separate trade and build phases. Every other mechanic checked matches the 6th edition apart from the deviations D-01 to D-08 in `docs/rules-matrix.md`. No earlier rulebook was audited clause by clause.
+
+**Decision:** The baseline is the 2025 6th edition. There is no separate migration target. Deviations are patched behind the engine adapter or in a minimal fork, each guarded by a strict-xfail test that flips when fixed.
+
+**Consequences:** Terminology follows the 6th edition where it differs (Longest Route, Invention), while code keeps Catanatron's names (`ROAD`, `YEAR_OF_PLENTY`).
+
+---
+
 ## Release timeboxes (§13.1)
 
 | Release | Started | Timebox | Status |
