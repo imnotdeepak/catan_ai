@@ -709,7 +709,7 @@ Each task should become a GitHub issue with an owner, acceptance tests and a rep
 - [x] **ENG-001:** Initialize `catan/` as a standalone GitHub repository (§12), Python environment (3.11+), project config, formatter, type checking, pytest and CI.
 - [x] **ENG-002:** Add Catanatron as a git submodule at `vendor/catanatron` and **pin** its commit; record Python/dependency versions and license.
 - [x] **ENG-003:** Create `docs/rules-matrix.md`; identify the edition Catanatron implements and verify all mechanics in §1. Patches for its deviations land in ENG-004 (adapter) and ENG-007 (RNG).
-- [ ] **ENG-004:** Implement action adapter with exhaustive legal-mask/offer-affordability tests.
+- [x] **ENG-004:** Implement action adapter with exhaustive legal-mask/offer-affordability tests (`src/catan_ai/engine/`).
 - [ ] **ENG-005:** Implement full truth referee event log + strictly filtered per-player observations.
 - [ ] **ENG-006:** Write hidden-state indistinguishability and private-card leak tests.
 - [ ] **ENG-007:** Verify independent branch RNG and non-perturbation of real-game future rolls.

@@ -61,7 +61,7 @@ The plan expected Catanatron to follow pre-2025 rules. Inspection shows its turn
 |---|---|---|---|
 | H-01 | `Player.decide(game, playable_actions)` receives the full `Game`, including every hand and the shuffled dev deck order | `game.py` `play_tick`; `state.py` `development_listdeck` | Built-in bots are privileged; our agents must go through the observation firewall (ENG-005) |
 | H-02 | Built-in bots never initiate domestic trades: `OFFER_TRADE` never appears in `playable_actions` and is accepted only through `is_valid_action` | `models/actions.py`, `game.py` | Ladder games contain no player-to-player trades (input to ENG-010) |
-| H-03 | Seating order is shuffled by the game RNG (`random.sample(players)`) | `state.py:100` | The arena must control seats explicitly for seat rotation (ENG-008) |
+| H-03 | Seating order is shuffled by the game RNG (`random.sample(players)`) | `state.py:100` | Handled: `EngineAdapter.new_game` seats players in the given order; the seed still fixes the board (ENG-004) |
 | H-04 | `TURNS_LIMIT = 1000` counts `num_turns`, which also advances during setup placements | `game.py`, `apply_action.py` `advance_turn` | Truncation threshold is approximate; arena reports truncation separately |
 | H-05 | Discards are resolved one card at a time in seat order starting from seat 0, so later discarders see earlier discards | `apply_action.py` `apply_roll`, `apply_discard` | Information ordering for the observation contract (Q-02) |
 | H-06 | No limit on repeated trade offers in a turn; an offer can be made during Road Building placement | `game.py` `is_valid_action` | Agent-level loop guard needed (plan §8.4) |
