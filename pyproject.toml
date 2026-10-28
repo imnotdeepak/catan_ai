@@ -4,7 +4,7 @@ version = "0.0.1"
 description = "Research AI for standard four-player base Catan, built on a pinned Catanatron engine."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["catanatron"]
+dependencies = ["catanatron", "numpy>=1.26", "torch>=2.4"]
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11"]
@@ -12,6 +12,13 @@ dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11"]
 [tool.uv.sources]
 # Pinned via the vendor/catanatron git submodule; see docs/architecture-decisions.md (ADR-001).
 catanatron = { path = "vendor/catanatron", editable = true }
+# CPU-only wheels: no GPU is assumed, and the default Linux wheel pulls in CUDA (ADR-007).
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["hatchling"]

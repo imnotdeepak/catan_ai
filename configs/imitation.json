@@ -1,0 +1,40 @@
+{
+  "description": "Imitation dataset (ML-012) and training (ML-014) for the Release 0.2 learned baseline. Teachers are the two strongest ladder bots; splits are disjoint board-seed ranges. Each group plays every distinct seat rotation of its lineup on each board and keeps each teacher decision with probability `keep`: many games, few samples each, so the value head cannot memorize winners by board.",
+  "name": "imitation-v2",
+  "dataset": {
+    "teachers": ["catanatron:AB:2", "catanatron:F"],
+    "splits": {
+      "train": {
+        "groups": [
+          {"lineup": ["catanatron:F", "catanatron:F", "catanatron:F", "catanatron:F"], "boards": 5000, "seed": 100000, "keep": 0.15},
+          {"lineup": ["catanatron:AB:2", "catanatron:F", "catanatron:AB:2", "catanatron:F"], "boards": 600, "seed": 110000, "keep": 0.15},
+          {"lineup": ["catanatron:F", "catanatron:AB:2", "catanatron:W", "catanatron:VP"], "boards": 300, "seed": 120000, "keep": 0.15}
+        ]
+      },
+      "dev": {
+        "groups": [
+          {"lineup": ["catanatron:F", "catanatron:F", "catanatron:F", "catanatron:F"], "boards": 500, "seed": 200000, "keep": 0.15},
+          {"lineup": ["catanatron:AB:2", "catanatron:F", "catanatron:AB:2", "catanatron:F"], "boards": 60, "seed": 210000, "keep": 0.15},
+          {"lineup": ["catanatron:F", "catanatron:AB:2", "catanatron:W", "catanatron:VP"], "boards": 30, "seed": 220000, "keep": 0.15}
+        ]
+      },
+      "holdout": {
+        "groups": [
+          {"lineup": ["catanatron:F", "catanatron:F", "catanatron:F", "catanatron:F"], "boards": 500, "seed": 300000, "keep": 0.15},
+          {"lineup": ["catanatron:AB:2", "catanatron:F", "catanatron:AB:2", "catanatron:F"], "boards": 60, "seed": 310000, "keep": 0.15},
+          {"lineup": ["catanatron:F", "catanatron:AB:2", "catanatron:W", "catanatron:VP"], "boards": 30, "seed": 320000, "keep": 0.15}
+        ]
+      }
+    }
+  },
+  "training": {
+    "seed": 0,
+    "epochs": 14,
+    "batch_size": 512,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "value_weight": 1.0,
+    "aux_weight": 0.1,
+    "net": {"hidden": 256, "layers": 3, "action_hidden": 128, "dropout": 0.1, "value_hidden": 128, "value_layers": 2, "value_dropout": 0.1}
+  }
+}

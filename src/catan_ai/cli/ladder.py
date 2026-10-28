@@ -65,6 +65,28 @@ def tier_section(tier: dict[str, Any], results: Sequence[MatchResult], minutes: 
     return "\n".join(lines)
 
 
+def run_tiers(
+    tiers: Sequence[dict[str, Any]], names: str | None, out: Path, workers: int
+) -> list[str]:
+    """Play the selected tiers (comma-separated `names`, default all); one report section each."""
+    wanted = set(names.split(",")) if names else None
+    sections = []
+    for tier in tiers:
+        if wanted is not None and tier["name"] not in wanted:
+            continue
+        print(f"tier {tier['name']}...", file=sys.stderr)
+        started = time.perf_counter()
+        results = run_tournament(
+            [Contestant(n) for n in tier["lineup"]],
+            tier["boards"],
+            tier["seed"],
+            out_dir=out / tier["name"],
+            workers=workers,
+        )
+        sections.append(tier_section(tier, results, (time.perf_counter() - started) / 60))
+    return sections
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--config", type=Path, default=REPO_ROOT / "configs" / "ladder.json")
@@ -75,21 +97,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     config = json.loads(args.config.read_text(encoding="utf-8"))
-    wanted = set(args.tiers.split(",")) if args.tiers else None
-    sections = []
-    for tier in config["tiers"]:
-        if wanted is not None and tier["name"] not in wanted:
-            continue
-        print(f"tier {tier['name']}...", file=sys.stderr)
-        started = time.perf_counter()
-        results = run_tournament(
-            [Contestant(n) for n in tier["lineup"]],
-            tier["boards"],
-            tier["seed"],
-            out_dir=args.out / tier["name"],
-            workers=args.workers,
-        )
-        sections.append(tier_section(tier, results, (time.perf_counter() - started) / 60))
+    sections = run_tiers(config["tiers"], args.tiers, args.out, args.workers)
 
     info = provenance()
     header = [

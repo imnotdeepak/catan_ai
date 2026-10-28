@@ -3,7 +3,7 @@
 import contextlib
 import io
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -14,13 +14,16 @@ from catan_ai.arena.serialize import (
     from_json_value,
     to_json_value,
 )
-from catan_ai.engine import SEAT_COLORS, IllegalActionError
+from catan_ai.engine import SEAT_COLORS, CanonicalAction, IllegalActionError
 from catan_ai.observations import Referee
 from catan_ai.provenance import provenance
 
 REPLAY_SCHEMA_VERSION = 1
 MAX_DECISIONS = 30_000  # safety cap; the engine also truncates at 1000 turns
 _BOT_CHATTER = io.StringIO()
+
+# Called with (seat, referee, chosen action) before each action is executed.
+DecisionObserver = Callable[[int, Referee, CanonicalAction], None]
 
 
 @dataclass(frozen=True)
@@ -52,8 +55,12 @@ def play_match(
     seed: int,
     seating: Sequence[Contestant],
     max_decisions: int = MAX_DECISIONS,
+    observer: DecisionObserver | None = None,
 ) -> tuple[MatchResult, Referee]:
-    """Play one game. Our agents see only their observations; engine bots see the game."""
+    """Play one game. Our agents see only their observations; engine bots see the game.
+
+    `observer` (e.g. a dataset recorder) is not counted in decision time.
+    """
     started = time.perf_counter()
     referee = Referee.new_game(
         seed, [c.engine_player(SEAT_COLORS[s]) for s, c in enumerate(seating)]
@@ -79,6 +86,8 @@ def play_match(
             _BOT_CHATTER.truncate()
         seconds[seat] += time.perf_counter() - tick
         decisions[seat] += 1
+        if observer is not None:
+            observer(seat, referee, action)
         try:
             referee.execute(action)
         except IllegalActionError as exc:
