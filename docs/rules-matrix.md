@@ -6,7 +6,7 @@ Maps each base-game rule to the Catanatron code that implements it, the test tha
 |---|---|
 | Rule set | **CATAN – The Game, 6th edition (2025)**, rulebook CN3081 v6.250401 (12 pages) |
 | Rulebook | https://www.catan.com/sites/default/files/2025-03/CN3081%20CATAN%E2%80%93The%20Game%20Rulebook%20secure%20%281%29.pdf |
-| Engine | Fork `imnotdeepak/catanatron`, branch `catan-ai-fixes` at `52213b3`: upstream `ecf9311` (v3.3.0) plus four rule fixes and one bot fix (ADR-001, ADR-005). Audit performed on upstream `ecf9311` |
+| Engine | Fork `imnotdeepak/catanatron`, branch `catan-ai-fixes` at `25f3599`: upstream `ecf9311` (v3.3.0) plus four rule fixes, one bot fix and one determinism fix (ADR-001, ADR-005). Audit performed on upstream `ecf9311` |
 | Audited | 2026-10-28 |
 | Tests | `tests/rules/test_conforming_rules.py` (R rows), `tests/rules/test_known_deviations.py` (D rows: regression tests once fixed, strict xfail while open) |
 
@@ -69,6 +69,7 @@ The plan expected Catanatron to follow pre-2025 rules. Inspection shows its turn
 | H-08 | Invention (Year of Plenty) offers a single card when the supply cannot supply two | `models/actions.py` `year_of_plenty_possibilities` | See Q-03 |
 | H-09 | GreedyPlayouts (`G`) creates a new process pool per candidate action, which is extremely slow on Windows (spawn), and prints every decision to stdout | `players/playouts.py` | Arena disables its multiprocessing (`USE_MULTIPROCESSING = False`) and silences bot stdout during decisions |
 | H-11 | AlphaBeta (`AB`) crashed when asked to respond to a domestic trade offer: its search had no case for trade actions | `players/tree_search_utils.py` `execute_spectrum` | **Fixed** in fork `52213b3`; see `docs/trade-audit.md` |
+| H-12 | Move generation iterated sets of colors and resource strings, whose order depends on the per-process hash seed, so the same seed played out differently in different processes | `models/actions.py`, `players/tree_search_utils.py` | **Fixed** in fork `25f3599`; arena parallel runs are tested equal to serial runs |
 | H-10 | Search bots (`AB`, `M`, `G`, `F`) simulate on `Game.copy()`, which shares the game RNG, so their thinking changes the real game's later dice | `players/*.py` | Matches stay deterministic per seed; replays force recorded outcomes (ENG-008) |
 
 ## Open interpretation questions

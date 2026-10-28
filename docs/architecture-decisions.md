@@ -100,6 +100,7 @@ Only the core package is installed. The `gym` extra (gymnasium<=0.29.1, numpy, p
 | `8e44f47` | Offerer not asked about its own offer; affordability checked at offer and confirm | D-06, D-07 |
 | `d252ad8` | Only the active player can win | D-02 |
 | `52213b3` | AlphaBeta treats domestic trade steps as deterministic instead of crashing | H-11 (ENG-010) |
+| `25f3599` | Sort sets of colors and resources in move generation and AlphaBeta, so seeded games replay identically in any process | H-12 (ENG-011) |
 
 D-01 (shared RNG on copy) stays in the adapter (ENG-007): upstream shares the RNG deliberately, and changing it would alter its search bots' behavior.
 

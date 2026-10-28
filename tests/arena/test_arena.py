@@ -126,3 +126,10 @@ def test_trade_probe_cli(capsys: Any) -> None:
     assert probe_main(["--bots", "catanatron:R", "--boards", "1"]) == 0
     report = json.loads(capsys.readouterr().out)["catanatron:R"]
     assert report["matches"] == 4 and report["errors"] == 0 and report["bot_offers"] == 0
+
+
+def test_parallel_tournament_matches_serial() -> None:
+    lineup = [Contestant("random"), Contestant("catanatron:W")] * 2
+    serial = run_tournament(lineup, boards=2, base_seed=40)
+    parallel = run_tournament(lineup, boards=2, base_seed=40, workers=3)
+    assert [timeless(r) for r in serial] == [timeless(r) for r in parallel]

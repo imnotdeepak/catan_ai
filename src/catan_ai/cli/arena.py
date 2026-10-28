@@ -21,6 +21,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=0, help="first board seed")
     parser.add_argument("--out", type=Path, default=None, help="directory for JSON output")
     parser.add_argument("--max-decisions", type=int, default=MAX_DECISIONS)
+    parser.add_argument("--workers", type=int, default=1, help="parallel processes")
     args = parser.parse_args(argv)
 
     lineup = [Contestant(name.strip()) for name in args.lineup.split(",")]
@@ -29,7 +30,9 @@ def main(argv: list[str] | None = None) -> int:
         outcome = result.winner or f"no winner ({result.truncation_reason or result.error})"
         print(f"{result.match_id}: {outcome} in {result.num_turns} turns", file=sys.stderr)
 
-    results = run_tournament(lineup, args.boards, args.seed, args.out, args.max_decisions, progress)
+    results = run_tournament(
+        lineup, args.boards, args.seed, args.out, args.max_decisions, progress, args.workers
+    )
     print(json.dumps(summarize(results), indent=2))
     return 0
 

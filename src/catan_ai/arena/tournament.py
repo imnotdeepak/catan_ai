@@ -8,6 +8,7 @@ seed regardless of seating).
 import json
 from collections import defaultdict
 from collections.abc import Callable, Sequence
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,13 @@ def rotations(lineup: Sequence[Contestant]) -> list[list[Contestant]]:
     return [[lineup[(seat + r) % 4] for seat in range(4)] for r in range(4)]
 
 
+def _play(spec: tuple[str, int, list[Contestant], int]) -> tuple[MatchResult, dict[str, Any]]:
+    """Worker entry point: play one match, return its result and replay record."""
+    match_id, seed, seating, max_decisions = spec
+    result, referee = play_match(match_id, seed, seating, max_decisions)
+    return result, replay_record(result, referee)
+
+
 def run_tournament(
     lineup: Sequence[Contestant],
     boards: int,
@@ -27,37 +35,51 @@ def run_tournament(
     out_dir: Path | None = None,
     max_decisions: int = MAX_DECISIONS,
     on_result: Callable[[MatchResult], None] | None = None,
+    workers: int = 1,
 ) -> list[MatchResult]:
+    """Play every board in all four seat rotations.
+
+    With `workers > 1`, matches run in parallel processes. Each match depends
+    only on its seed and seating, so results are identical to a serial run;
+    they are returned and written in match order.
+    """
     if len(lineup) != 4:
         raise ValueError("A lineup is exactly four contestants")
-    results_file = replays_dir = None
+    specs = [
+        (f"s{base_seed}-b{board}-r{r}", base_seed + board, seating, max_decisions)
+        for board in range(boards)
+        for r, seating in enumerate(rotations(lineup))
+    ]
+    replays_dir = None
     if out_dir is not None:
         replays_dir = out_dir / "replays"
         replays_dir.mkdir(parents=True, exist_ok=True)
-        results_file = (out_dir / "results.jsonl").open("w", encoding="utf-8")
 
-    results = []
-    try:
-        for board in range(boards):
-            seed = base_seed + board
-            for r, seating in enumerate(rotations(lineup)):
-                match_id = f"s{base_seed}-b{board}-r{r}"
-                result, referee = play_match(match_id, seed, seating, max_decisions)
-                results.append(result)
-                if results_file is not None and replays_dir is not None:
-                    results_file.write(json.dumps(result.to_json()) + "\n")
-                    results_file.flush()
-                    replay_path = replays_dir / f"{match_id}.json"
-                    replay_path.write_text(
-                        json.dumps(replay_record(result, referee)), encoding="utf-8"
-                    )
-                if on_result is not None:
-                    on_result(result)
-    finally:
-        if results_file is not None:
-            results_file.close()
+    def finished(result: MatchResult, record: dict[str, Any]) -> None:
+        if replays_dir is not None:
+            path = replays_dir / f"{result.match_id}.json"
+            path.write_text(json.dumps(record), encoding="utf-8")
+        if on_result is not None:
+            on_result(result)
+
+    by_id: dict[str, MatchResult] = {}
+    if workers <= 1:
+        for spec in specs:
+            result, record = _play(spec)
+            by_id[result.match_id] = result
+            finished(result, record)
+    else:
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            for future in as_completed(pool.submit(_play, spec) for spec in specs):
+                result, record = future.result()
+                by_id[result.match_id] = result
+                finished(result, record)
+    results = [by_id[spec[0]] for spec in specs]
 
     if out_dir is not None:
+        with (out_dir / "results.jsonl").open("w", encoding="utf-8") as f:
+            for result in results:
+                f.write(json.dumps(result.to_json()) + "\n")
         summary = summarize(results)
         summary["config"] = {
             "lineup": [c.name for c in lineup],
