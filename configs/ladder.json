@@ -1,0 +1,29 @@
+{
+  "description": "Reference ladder of Catanatron built-in bots (ENG-011). Each tier is a four-player lineup played on every board in all four seat rotations.",
+  "tiers": [
+    {
+      "name": "fast",
+      "lineup": ["catanatron:R", "catanatron:W", "catanatron:VP", "catanatron:F"],
+      "boards": 100,
+      "seed": 1000
+    },
+    {
+      "name": "strong",
+      "lineup": ["catanatron:AB:2", "catanatron:F", "catanatron:W", "catanatron:VP"],
+      "boards": 50,
+      "seed": 2000
+    },
+    {
+      "name": "search",
+      "lineup": ["catanatron:AB:2", "catanatron:F", "catanatron:M:50", "catanatron:G:10"],
+      "boards": 10,
+      "seed": 3000
+    }
+  ],
+  "baseline": {
+    "lineup": ["random", "random-trader", "catanatron:R", "catanatron:W"],
+    "boards": 250,
+    "seed": 0,
+    "replay_check_every": 10
+  }
+}
