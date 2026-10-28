@@ -129,11 +129,15 @@ class EngineAdapter:
             return False
         return bool(is_valid_action(self._game.playable_actions, self._game.state, engine_action))
 
-    def execute(self, action: CanonicalAction) -> None:
-        """Apply a legal action, or raise IllegalActionError without changing state."""
+    def execute(self, action: CanonicalAction) -> Any:
+        """Apply a legal action, or raise IllegalActionError without changing state.
+
+        Returns the engine's random outcome, if any (privileged): dice for ROLL,
+        the card drawn for BUY_DEV_CARD, the resource stolen for MOVE_ROBBER.
+        """
         if not self.is_legal(action):
             raise IllegalActionError(f"Illegal action: {action.key}")
-        self._game.execute(self._to_engine(action))
+        return self._game.execute(self._to_engine(action)).result
 
     def engine_player_decision(self) -> CanonicalAction:
         """Ask the seated Catanatron bot to decide (privileged: it sees the full game)."""

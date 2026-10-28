@@ -73,6 +73,6 @@ The plan expected Catanatron to follow pre-2025 rules. Inspection shows its turn
 | ID | Question | Current position | Resolve via |
 |---|---|---|---|
 | Q-01 | If the Longest Route holder's route is broken and they now **tie** with another player, do they keep the tile? | Rule text is "no longer meet the requirements"; holding requires having the longest route, and a tie doesn't take it away elsewhere. Provisional: holder keeps it on a tie | Official FAQ (https://www.catan.com/faq/basegame) before patching D-05 |
-| Q-02 | Are discarded card types public? | Resource supply stacks are face up (p.4, p.11) and discards return to them, so treat discard types as public | Observation contract (ENG-005) |
+| Q-02 | Are discarded card types public? | **Resolved:** public. Supply stacks are face up (p.4, p.11) and discards return to them | `docs/observation-contract.md` OC-01 |
 | Q-03 | Invention when the supply has fewer than 2 suitable cards | Rule is silent; keep engine behavior (take what is available) | FAQ; low impact |
 | Q-04 | A player who reaches 10 VP on another player's turn | Under p.10 they win once their own turn begins, if they still have 10 | Implemented in fork with D-02 |
