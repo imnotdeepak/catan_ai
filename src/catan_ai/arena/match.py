@@ -1,5 +1,7 @@
 """One four-player match, its result record, and exact replay (ENG-008)."""
 
+import contextlib
+import io
 import time
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
@@ -18,6 +20,7 @@ from catan_ai.provenance import provenance
 
 REPLAY_SCHEMA_VERSION = 1
 MAX_DECISIONS = 30_000  # safety cap; the engine also truncates at 1000 turns
+_BOT_CHATTER = io.StringIO()
 
 
 @dataclass(frozen=True)
@@ -70,7 +73,10 @@ def play_match(
         if seat in agents:
             action = agents[seat].decide(referee.observe(seat))
         else:
-            action = adapter.engine_player_decision()
+            with contextlib.redirect_stdout(_BOT_CHATTER):  # some bots print per decision
+                action = adapter.engine_player_decision()
+            _BOT_CHATTER.seek(0)
+            _BOT_CHATTER.truncate()
         seconds[seat] += time.perf_counter() - tick
         decisions[seat] += 1
         try:

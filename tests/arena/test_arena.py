@@ -109,3 +109,20 @@ def test_cli_runs(tmp_path: Path, capsys: Any) -> None:
     )
     assert code == 0
     assert json.loads(capsys.readouterr().out)["matches"] == 4
+
+
+def test_random_trader_completes_lawful_trades() -> None:
+    lineup = [Contestant("random-trader")] + [Contestant("catanatron:R")] * 3
+    result, referee = play_match("m", 25, lineup)
+    assert result.error is None
+    kinds = [e.event_type for e in referee.events]
+    assert kinds.count(ActionKind.OFFER_TRADE) > 10
+    assert ActionKind.CONFIRM_TRADE in kinds
+
+
+def test_trade_probe_cli(capsys: Any) -> None:
+    from catan_ai.cli.trade_probe import main as probe_main
+
+    assert probe_main(["--bots", "catanatron:R", "--boards", "1"]) == 0
+    report = json.loads(capsys.readouterr().out)["catanatron:R"]
+    assert report["matches"] == 4 and report["errors"] == 0 and report["bot_offers"] == 0

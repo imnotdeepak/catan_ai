@@ -1,0 +1,10 @@
+{
+  "source": "reports/throughput.md (ENG-009)",
+  "random_rollouts_per_s": 34.3,
+  "rollouts_per_decision": {
+    "0.1s": 3,
+    "1.0s": 34,
+    "5.0s": 171
+  },
+  "note": "Upper bounds for uniformly random, single-process playouts from midgame. Learned or heuristic rollout policies cost more per step; re-measure."
+}
