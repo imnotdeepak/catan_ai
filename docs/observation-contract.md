@@ -70,5 +70,5 @@ The tests were checked against five deliberately planted leaks (an opponent's wo
 
 ## Known limits
 
-- Policy-level indistinguishability (identical action probabilities under scrambled hidden state) needs agents and is tested once agents exist (Release 0.2). The observation-level test is its foundation: a policy reading only observations cannot do better than its input.
+- Policy-level indistinguishability (identical priors and values under scrambled hidden state) is tested for the heuristic and the network in `tests/models/test_models.py` (Release 0.2). It rests on the observation-level test: a policy reading only observations cannot see more than its input.
 - `history` grows with the game; observations share event objects, which are immutable.

@@ -146,10 +146,13 @@ Training and arena runs use the firewalled path; only search internals may use t
 
 **Decision:**
 
-- **PyTorch, CPU wheels**, from the `pytorch-cpu` index pinned in `pyproject.toml`. CI on Linux would otherwise download the CUDA build. A ~650k-parameter MLP trains in minutes on CPU and decides in under 1 ms per move, so a GPU is not needed at this scale.
+- **PyTorch, CPU wheels**, from the `pytorch-cpu` index pinned in `pyproject.toml`. CI on Linux would otherwise download the CUDA build. A ~850k-parameter MLP trains in about 13 minutes on CPU and decides in under 1 ms per move, so a GPU is not needed at this scale.
 - **Features** (`src/catan_ai/models/features.py`, version 1) take only a `PlayerObservation`. Seats are relative to the viewer, so one network plays every seat. Board topology comes from Catanatron's static base map; tests check it matches every board.
 - **Action-conditioned policy:** a shared scorer f(state, action) over the engine's legal candidates, with a masked softmax, never a fixed action index. `PolicyAgent` falls back to the deterministic `HeuristicPolicyValue` if the model fails, so every phase always has a legal move.
 - **Dataset storage: compressed NumPy `.npz`, not Parquet** (plan §9.4). Samples are dense fixed-width arrays plus variable-length candidate sets in CSR form (`offsets`), which `.npz` holds without another dependency. Privileged labels are in their own file (`privileged.npz`). `manifest.json` records the config, provenance and sha256 of every file. Loading verifies the hashes, and a dataset directory is never overwritten.
+- **Two towers.** The policy tower and the outcome tower (value, final-points auxiliary) share no weights, and each is early-stopped on its own dev loss. Outcome labels are constant within a game, so a shared trunk learns to recognize training boards, which damages both heads (`reports/imitation_training.md`, design notes).
+- **Many games, few samples each.** The dataset keeps each teacher decision with probability 0.15 across 7,400 games instead of every decision of a few hundred games.
+- **Champions are committed** under `champions/` (about 3.4 MB each), so anyone can play or evaluate them without retraining. Datasets and working checkpoints stay out of git (`data/`, `checkpoints/`).
 - **Splits are disjoint board-seed ranges** (train 100000+, dev 200000+, holdout 300000+, evaluation 400000+), which the builder checks.
 
 **Alternatives:** Parquet via pyarrow (columnar, but awkward for nested candidate sets and an extra 100 MB dependency); storing raw observations and encoding during training (smaller files, but re-encoding every epoch costs more than the training itself); a fixed flat action space (cannot represent trade offers or grow with later candidate generators).
@@ -163,7 +166,7 @@ Training and arena runs use the firewalled path; only search internals may use t
 | Release | Started | Timebox | Status |
 |---|---|---|---|
 | 0.1 Rules + Arena | 2026-10-28 | 6 weeks, target 2026-12-09; cut to exit gate if unfinished by 2026-12-30 (+50%) | **Complete 2026-10-28**: exit gate passed (`reports/baseline_report.md`), ladder in `reports/ladder.md` |
-| 0.2 Learning baseline | 2026-10-28 | 4 weeks, target 2026-11-25; cut to exit gate if unfinished by 2026-12-09 (+50%) | In progress |
+| 0.2 Learning baseline | 2026-10-28 | 4 weeks, target 2026-11-25; cut to exit gate if unfinished by 2026-12-09 (+50%) | **Complete 2026-10-28**: champion `champions/imitation-v1.pt`, `reports/imitation_training.md`, `reports/evaluation_0.2.md` |
 
 Release 0.1 timebox assumes roughly 10–15 hours/week. Estimate by task: ENG-003 3–4 days; ENG-004 ~1 week; ENG-005/006 1.5–2 weeks; ENG-007 1–2 days; ENG-008 3–5 days; ENG-009 1–2 days; ENG-010 2–3 days; ENG-011 1–2 days.
 

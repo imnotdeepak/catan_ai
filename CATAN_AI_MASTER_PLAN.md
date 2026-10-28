@@ -720,10 +720,10 @@ Each task should become a GitHub issue with an owner, acceptance tests and a rep
 
 ### P1 — Release 0.2: learning baseline
 
-- [ ] **ML-012:** Frozen imitation dataset from ladder games, with player-view-only inputs and privileged labels isolated.
-- [ ] **ML-013:** Action-conditioned PyTorch model with legal masking and fallback, behind a common policy/value evaluation interface (with a deterministic heuristic implementation of the same interface).
-- [ ] **ML-014:** Policy/value and auxiliary training, loss/evaluation dashboards.
-- [ ] **ML-015:** Evaluate the learned baseline on the reference ladder; it becomes the first champion.
+- [x] **ML-012:** Frozen imitation dataset from ladder games, with player-view-only inputs and privileged labels isolated.
+- [x] **ML-013:** Action-conditioned PyTorch model with legal masking and fallback, behind a common policy/value evaluation interface (with a deterministic heuristic implementation of the same interface).
+- [x] **ML-014:** Policy/value and auxiliary training, loss/evaluation dashboards.
+- [x] **ML-015:** Evaluate the learned baseline on the reference ladder; it becomes the first champion.
 
 ### P2 — Release 0.3: strategic foundations
 
