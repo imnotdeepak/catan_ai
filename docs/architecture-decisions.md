@@ -67,4 +67,6 @@ Only the core package is installed. The `gym` extra (gymnasium<=0.29.1, numpy, p
 
 | Release | Started | Timebox | Status |
 |---|---|---|---|
-| 0.1 Rules + Arena | 2026-10-28 | _to be set by owner_ | In progress |
+| 0.1 Rules + Arena | 2026-10-28 | 6 weeks, target 2026-12-09; cut to exit gate if unfinished by 2026-12-30 (+50%) | In progress |
+
+Release 0.1 timebox assumes roughly 10–15 hours/week. Estimate by task: ENG-003 3–4 days; ENG-004 ~1 week; ENG-005/006 1.5–2 weeks; ENG-007 1–2 days; ENG-008 3–5 days; ENG-009 1–2 days; ENG-010 2–3 days; ENG-011 1–2 days.
