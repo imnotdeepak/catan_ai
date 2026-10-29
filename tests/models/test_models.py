@@ -185,3 +185,22 @@ def test_policy_and_outcome_towers_share_no_weights() -> None:
         touched = parameter.grad is not None and bool(parameter.grad.abs().sum() > 0)
         if not is_outcome_parameter(name):
             assert not touched, f"value loss reaches policy parameter {name}"
+
+
+def test_v3_adds_prior_scores_to_settlement_candidates_only() -> None:
+    from catan_ai.models.prior_features import PRIOR_ACTION_DIM, PRIOR_SCALE
+    from catan_ai.opening.board import analyze
+    from catan_ai.opening.priors import prior_scores
+
+    obs = next(o for o in sample_observations(3, every=1) if o.prompt == "BUILD_INITIAL_SETTLEMENT")
+    _, rows = encode(obs, 3)
+    priors = rows[:, -PRIOR_ACTION_DIM:]
+    analysis = analyze(obs)
+    for action, row in zip(obs.legal_actions, priors, strict=True):
+        expected = prior_scores(analysis, obs.seat, action.params[0]) / PRIOR_SCALE
+        np.testing.assert_allclose(row, expected, rtol=1e-6)
+    turn = next(o for o in sample_observations(3) if o.prompt == "PLAY_TURN")
+    _, rows = encode(turn, 3)
+    for action, row in zip(turn.legal_actions, rows[:, -PRIOR_ACTION_DIM:], strict=True):
+        if action.kind != ActionKind.BUILD_SETTLEMENT:
+            assert not row.any()
