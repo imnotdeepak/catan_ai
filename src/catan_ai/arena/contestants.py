@@ -11,6 +11,8 @@
 - `draft:<rule>:<spec>`: initial settlements and roads by pair search over the
   predicted snake draft (`catan_ai.opening.draft`), scored by `<rule>`;
   `draft-settle:<rule>:<spec>` searches settlements only and leaves roads to `<spec>`.
+- `defend:<spec>`: robber moves chosen to delay the opponent that threatens to
+  win first (`catan_ai.victory.threats`), every other decision by `<spec>`.
 - `catanatron:<spec>`: a built-in bot by registry spec, e.g. `catanatron:F`,
   `catanatron:AB:2`, `catanatron:W`. These receive the full engine `Game` and
   are therefore privileged (rules matrix H-01); results label them so.
@@ -40,6 +42,7 @@ ENGINE_PREFIX = "catanatron:"
 MODEL_PREFIX = "model:"
 # Wrappers that take over initial placement: "<prefix><rule>:<inner agent spec>".
 OPENING_PREFIXES = ("opening:", "draft:", "draft-settle:")
+DEFEND_PREFIX = "defend:"
 AGENTS: dict[str, Callable[[str], Agent]] = {
     "random": RandomAgent,
     "random-trader": RandomTraderAgent,
@@ -69,6 +72,9 @@ class Contestant:
             REGISTRY.lookup(self.engine_spec.split(":")[0])  # fail fast on unknown codes
         elif self.is_model:
             load_policy(self.name.removeprefix(MODEL_PREFIX))  # fail fast on bad checkpoints
+        elif self.is_defend:
+            if Contestant(self.defend_inner).is_engine_bot:
+                raise ValueError(f"{self.name!r}: engine bots act engine-side, cannot be wrapped")
         elif self.is_opening:
             from catan_ai.opening.priors import RULES
 
@@ -83,6 +89,7 @@ class Contestant:
                     *AGENTS,
                     f"{MODEL_PREFIX}<checkpoint>",
                     *(f"{p}<rule>:<agent>" for p in OPENING_PREFIXES),
+                    f"{DEFEND_PREFIX}<agent>",
                     f"{ENGINE_PREFIX}<code>",
                 ]
             )
@@ -95,6 +102,14 @@ class Contestant:
     @property
     def is_model(self) -> bool:
         return self.name.startswith(MODEL_PREFIX)
+
+    @property
+    def is_defend(self) -> bool:
+        return self.name.startswith(DEFEND_PREFIX)
+
+    @property
+    def defend_inner(self) -> str:
+        return self.name.removeprefix(DEFEND_PREFIX)
 
     @property
     def is_opening(self) -> bool:
@@ -122,6 +137,10 @@ class Contestant:
         return SimplePlayer(color)
 
     def make_agent(self, seed: str) -> Agent:
+        if self.is_defend:
+            from catan_ai.victory.threats import DefendAgent
+
+            return DefendAgent(Contestant(self.defend_inner).make_agent(seed))
         if self.is_opening:
             from catan_ai.opening.agent import OpeningRuleAgent
             from catan_ai.opening.draft import DraftSearchAgent

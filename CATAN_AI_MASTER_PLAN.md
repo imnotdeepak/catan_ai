@@ -731,8 +731,8 @@ Each task should become a GitHub issue with an owner, acceptance tests and a rep
 - [x] **STR-017:** Six opening strategy priors, comparison against pip heuristic.
 - [x] **STR-018:** Opening settlement+road pair candidate search and remaining snake-draft prediction.
 - [x] **STR-019:** Exact VP, city, road, army and dev timing tests.
-- [ ] **STR-020:** Victory AND/OR dependency graph with branch contingencies.
-- [ ] **STR-021:** Defensive action and turn-order threat tests.
+- [x] **STR-020:** Victory AND/OR dependency graph with branch contingencies.
+- [x] **STR-021:** Defensive action and turn-order threat tests.
 
 ### P3 — Release 0.4: intelligence and trading
 

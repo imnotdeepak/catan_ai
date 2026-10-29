@@ -236,11 +236,17 @@ def objectives(
 
 
 def plan_for(
-    observation: PlayerObservation, seat: int, analysis: BoardAnalysis | None = None
+    observation: PlayerObservation,
+    seat: int,
+    analysis: BoardAnalysis | None = None,
+    points: int | None = None,
 ) -> Plan:
+    """`seat`'s route to 10 from `points` (default: the viewer's exact score, or an
+    opponent's visible score, i.e. assuming it holds no VP cards)."""
     analysis = analysis if analysis is not None else analyze(observation)
-    low, high = points_range(observation, seat)
-    points = low if seat != observation.seat else high
+    if points is None:
+        low, high = points_range(observation, seat)
+        points = low if seat != observation.seat else high
     hand = estimated_hand(observation, seat, analysis)
     built: list[int] = []
     taken: set[int] = set()
