@@ -1,6 +1,6 @@
 {
   "description": "Imitation dataset (ML-012) and training (ML-014) for the Release 0.2 learned baseline. Teachers are the two strongest ladder bots; splits are disjoint board-seed ranges. Each group plays every distinct seat rotation of its lineup on each board and keeps each teacher decision with probability `keep`: many games, few samples each, so the value head cannot memorize winners by board.",
-  "name": "imitation-v2",
+  "name": "imitation-v3",
   "dataset": {
     "teachers": ["catanatron:AB:2", "catanatron:F"],
     "splits": {

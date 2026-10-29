@@ -24,6 +24,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
+from catan_ai.models.encoding import dims
 from catan_ai.models.features import ACTION_KINDS, PROMPT_SLICE, PROMPTS
 from catan_ai.models.network import (
     NetConfig,
@@ -162,7 +163,9 @@ def train(
 ) -> tuple[PolicyValueNet, list[dict[str, Any]]]:
     torch.manual_seed(config["seed"])
     rng = np.random.default_rng(config["seed"])
-    net = PolicyValueNet(NetConfig(**config["net"]))
+    version = train_split.feature_version
+    state_dim, action_dim = dims(version)
+    net = PolicyValueNet(NetConfig(version, state_dim, action_dim, **config["net"]))
     optimizer = torch.optim.AdamW(
         net.parameters(), lr=config["lr"], weight_decay=config["weight_decay"]
     )

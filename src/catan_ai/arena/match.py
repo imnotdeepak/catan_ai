@@ -140,8 +140,10 @@ def replay_record(result: MatchResult, referee: Referee) -> dict[str, Any]:
     }
 
 
-def replay(record: dict[str, Any]) -> Referee:
+def replay(record: dict[str, Any], observer: DecisionObserver | None = None) -> Referee:
     """Rebuild a match from its replay record, forcing every recorded random outcome.
+
+    `observer` sees each decision as in `play_match`, e.g. to re-encode a dataset.
 
     Built-in search bots draw from the game RNG while thinking, so the dice a
     match saw depend on their internal search; forcing outcomes makes replay
@@ -150,6 +152,9 @@ def replay(record: dict[str, Any]) -> Referee:
     if record["schema_version"] != REPLAY_SCHEMA_VERSION:
         raise ValueError(f"Unsupported replay schema {record['schema_version']}")
     referee = Referee.new_game(record["seed"])
-    for action, outcome in zip(record["actions"], record["outcomes"], strict=True):
-        referee.execute(action_from_json(action), from_json_value(outcome))
+    for action_json, outcome in zip(record["actions"], record["outcomes"], strict=True):
+        action = action_from_json(action_json)
+        if observer is not None:
+            observer(referee.adapter.current_seat, referee, action)
+        referee.execute(action, from_json_value(outcome))
     return referee

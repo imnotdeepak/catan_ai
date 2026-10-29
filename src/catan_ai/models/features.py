@@ -5,8 +5,8 @@ anything the viewing seat could not know (plan §2.1). Seats are encoded
 relative to the viewer (0 = me, 1 = next to act after me, ...), so one model
 plays every seat.
 
-Release 0.2 uses only simple board features (plan §9.2): no history summary,
-beliefs or planner outputs. Those arrive later as ablations.
+This is feature version 1, the Release 0.2 baseline (plan §9.2). Later versions
+append blocks to it; see `encoding.py`.
 
 Board topology (tile coordinates, node ids, edges) is Catanatron's static base
 map. It is public, identical on every board, and checked by tests.
@@ -21,7 +21,6 @@ from catanatron.models.map import TOURNAMENT_MAP
 from catan_ai.engine.actions import RESOURCES, ActionKind, CanonicalAction
 from catan_ai.observations import DEV_CARDS, PlayerObservation
 
-FEATURE_VERSION: Final = 1
 NUM_SEATS: Final = 4
 
 PROMPTS: Final = (

@@ -115,9 +115,18 @@ def test_keep_rate_thins_samples_reproducibly() -> None:
     from catan_ai.training.dataset import _record_game
 
     spec = ("k", 10, LINEUP, TEACHERS)
-    full = _record_game((*spec, 1.0))
-    thin = _record_game((*spec, 0.3))
-    again = _record_game((*spec, 0.3))
+    full = _record_game((*spec, 1.0, 2))
+    thin = _record_game((*spec, 0.3, 2))
+    again = _record_game((*spec, 0.3, 2))
     assert 0 < len(thin["label"]) < 0.5 * len(full["label"])
     assert np.array_equal(thin["states"], again["states"])
     assert np.array_equal(thin["label"], again["label"])
+
+
+def test_reencoding_from_replays_reproduces_the_dataset(data_dir: Path, tmp_path: Path) -> None:
+    manifest = build_dataset(config(), tmp_path, source=data_dir)
+    assert manifest["reencoded_from"] == str(data_dir)
+    for name in ("train", "dev"):
+        original, rebuilt = load_split(data_dir, name), load_split(tmp_path, name)
+        for field in ("states", "actions", "offsets", "label", "winner", "opponent_hands", "seat"):
+            assert np.array_equal(getattr(original, field), getattr(rebuilt, field)), field

@@ -1,12 +1,10 @@
 """Policy/value models: player-view features, the common interface, the network."""
 
-from catan_ai.models.features import (
-    ACTION_DIM,
-    FEATURE_VERSION,
-    STATE_DIM,
-    BoardContext,
-    encode_actions,
-    encode_state,
+from catan_ai.models.encoding import (
+    FEATURE_VERSIONS,
+    LATEST_FEATURE_VERSION,
+    dims,
+    encode,
 )
 from catan_ai.models.interface import (
     Evaluation,
@@ -16,14 +14,12 @@ from catan_ai.models.interface import (
 )
 
 __all__ = [
-    "ACTION_DIM",
-    "FEATURE_VERSION",
-    "STATE_DIM",
-    "BoardContext",
+    "FEATURE_VERSIONS",
+    "LATEST_FEATURE_VERSION",
     "Evaluation",
     "HeuristicPolicyValue",
     "PolicyAgent",
     "PolicyValue",
-    "encode_actions",
-    "encode_state",
+    "dims",
+    "encode",
 ]

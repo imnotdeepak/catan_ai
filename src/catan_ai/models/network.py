@@ -26,15 +26,8 @@ import numpy as np
 import torch
 from torch import nn
 
-from catan_ai.models.features import (
-    ACTION_DIM,
-    FEATURE_VERSION,
-    NUM_SEATS,
-    STATE_DIM,
-    BoardContext,
-    encode_actions,
-    encode_state,
-)
+from catan_ai.models.encoding import LATEST_FEATURE_VERSION, check, dims, encode
+from catan_ai.models.features import NUM_SEATS
 from catan_ai.models.interface import Evaluation
 from catan_ai.observations import PlayerObservation
 
@@ -43,8 +36,9 @@ NUM_RESOURCES = 5
 
 @dataclass(frozen=True)
 class NetConfig:
-    state_dim: int = STATE_DIM
-    action_dim: int = ACTION_DIM
+    feature_version: int = LATEST_FEATURE_VERSION
+    state_dim: int = dims(LATEST_FEATURE_VERSION)[0]
+    action_dim: int = dims(LATEST_FEATURE_VERSION)[1]
     hidden: int = 256
     layers: int = 3
     action_hidden: int = 128
@@ -108,7 +102,7 @@ def save_checkpoint(path: Path, net: PolicyValueNet, metadata: dict[str, Any]) -
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
-            "feature_version": FEATURE_VERSION,
+            "feature_version": net.config.feature_version,
             "config": asdict(net.config),
             "state_dict": net.state_dict(),
             "metadata": metadata,
@@ -119,12 +113,10 @@ def save_checkpoint(path: Path, net: PolicyValueNet, metadata: dict[str, Any]) -
 
 def load_checkpoint(path: Path) -> tuple[PolicyValueNet, dict[str, Any]]:
     blob = torch.load(path, map_location="cpu", weights_only=True)
-    if blob["feature_version"] != FEATURE_VERSION:
-        raise ValueError(
-            f"{path} was trained on features v{blob['feature_version']}, "
-            f"this code encodes v{FEATURE_VERSION}"
-        )
-    net = PolicyValueNet(NetConfig(**blob["config"]))
+    version = blob["feature_version"]
+    check(version)
+    # Release 0.2 checkpoints predate the field; the blob always records it.
+    net = PolicyValueNet(NetConfig(**{**blob["config"], "feature_version": version}))
     net.load_state_dict(blob["state_dict"])
     net.eval()
     return net, blob["metadata"]
@@ -138,9 +130,9 @@ class LearnedPolicyValue:
 
     @torch.inference_mode()
     def evaluate(self, observation: PlayerObservation) -> Evaluation:
-        ctx = BoardContext(observation)
-        states = torch.from_numpy(encode_state(observation, ctx)).unsqueeze(0)
-        actions = torch.from_numpy(encode_actions(observation, context=ctx)).unsqueeze(0)
+        state, rows = encode(observation, self.net.config.feature_version)
+        states = torch.from_numpy(state).unsqueeze(0)
+        actions = torch.from_numpy(rows).unsqueeze(0)
         mask = torch.ones(actions.shape[:2], dtype=torch.bool)
         out = self.net(states, actions, mask)
         priors = torch.softmax(out["policy_logits"][0], dim=0).tolist()

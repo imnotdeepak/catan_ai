@@ -1,5 +1,6 @@
 """Encoder, policy/value interface and network (ML-013)."""
 
+import itertools
 import random
 from dataclasses import replace
 from pathlib import Path
@@ -11,21 +12,23 @@ import torch
 from catan_ai.arena import Contestant, play_match
 from catan_ai.engine import ActionKind, CanonicalAction, EngineAdapter
 from catan_ai.models import (
-    ACTION_DIM,
-    STATE_DIM,
+    FEATURE_VERSIONS,
     HeuristicPolicyValue,
     PolicyAgent,
     PolicyValue,
-    encode_actions,
-    encode_state,
+    dims,
+    encode,
 )
 from catan_ai.models.features import (
     _GLOBAL_AT,
     _PLAYERS_AT,
+    ACTION_DIM,
     EDGES,
     PLAYER_WIDTH,
+    STATE_DIM,
     TILE_COORDS,
     TILE_NODES,
+    encode_state,
 )
 from catan_ai.models.interface import Evaluation
 from catan_ai.models.network import (
@@ -58,15 +61,27 @@ def sample_observations(seed: int, every: int = 7) -> list[PlayerObservation]:
 
 def test_encodings_have_fixed_shapes_and_are_finite() -> None:
     for obs in sample_observations(3):
-        state, actions = encode_state(obs), encode_actions(obs)
-        assert state.shape == (STATE_DIM,)
-        assert actions.shape == (len(obs.legal_actions), ACTION_DIM)
-        assert np.isfinite(state).all() and np.isfinite(actions).all()
+        for version in FEATURE_VERSIONS:
+            state, actions = encode(obs, version)
+            assert state.shape == (dims(version)[0],)
+            assert actions.shape == (len(obs.legal_actions), dims(version)[1])
+            assert np.isfinite(state).all() and np.isfinite(actions).all()
+
+
+def test_feature_versions_only_append() -> None:
+    """A later version starts with the exact encoding of the version before, so
+    checkpoints and datasets keep the encoding they were built with."""
+    assert dims(1) == (STATE_DIM, ACTION_DIM)
+    for obs in sample_observations(13):
+        for old, new in itertools.pairwise(FEATURE_VERSIONS):
+            (s_old, a_old), (s_new, a_new) = encode(obs, old), encode(obs, new)
+            assert np.array_equal(s_new[: len(s_old)], s_old)
+            assert np.array_equal(a_new[:, : a_old.shape[1]], a_old)
 
 
 def test_distinct_legal_actions_get_distinct_encodings() -> None:
     for obs in sample_observations(5):
-        rows = {encode_actions(obs)[i].tobytes() for i in range(len(obs.legal_actions))}
+        rows = {encode(obs)[1][i].tobytes() for i in range(len(obs.legal_actions))}
         assert len(rows) == len(obs.legal_actions), obs.prompt
 
 
@@ -161,8 +176,9 @@ def test_policy_and_outcome_towers_share_no_weights() -> None:
 
     net = PolicyValueNet()
     obs = sample_observations(8)[3]
-    states = torch.from_numpy(encode_state(obs)).unsqueeze(0)
-    actions = torch.from_numpy(encode_actions(obs)).unsqueeze(0)
+    state, rows = encode(obs)
+    states = torch.from_numpy(state).unsqueeze(0)
+    actions = torch.from_numpy(rows).unsqueeze(0)
     out = net(states, actions, torch.ones(actions.shape[:2], dtype=torch.bool))
     out["value_logits"].sum().backward()
     for name, parameter in net.named_parameters():
