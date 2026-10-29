@@ -736,9 +736,9 @@ Each task should become a GitHub issue with an owner, acceptance tests and a rep
 
 ### P3 — Release 0.4: intelligence and trading
 
-- [ ] **BEL-022:** Event-sourced exact resource/development-card ledger (Tier 1).
-- [ ] **BEL-023:** Enumerated joint hypotheses for ambiguous events, with conservation assertions (Tier 2).
-- [ ] **BEL-024:** Particle fallback, collapse detection/recovery and calibration harness (Tier 3). Build only if tier-usage data from BEL-023 shows enumeration exceeds budget.
+- [x] **BEL-022:** Event-sourced exact resource/development-card ledger (Tier 1).
+- [x] **BEL-023:** Enumerated joint hypotheses for ambiguous events, with conservation assertions (Tier 2).
+- [x] **BEL-024:** Particle fallback, collapse detection/recovery and calibration harness (Tier 3). Build only if tier-usage data from BEL-023 shows enumeration exceeds budget.
 - [ ] **OPP-025:** Opponent interface (§7.2) and policy-mixture baseline; then learned next-action and trade-response predictors.
 - [ ] **TRD-026:** Candidate proposal generator and bank/port fallback.
 - [ ] **TRD-027:** Domestic trade state machine, rule-lawful counteroffers and loop guards, scoped by ENG-010.
