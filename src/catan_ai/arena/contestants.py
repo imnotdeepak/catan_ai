@@ -5,6 +5,9 @@
 - `heuristic`: greedy play from the deterministic HeuristicPolicyValue.
 - `model:<checkpoint>`: greedy play from a trained policy/value checkpoint
   (path relative to the repo root, or absolute).
+- `opening:<rule>:<spec>`: initial settlements by an opening rule
+  (`catan_ai.opening.priors.RULES`), every other decision by the agent `<spec>`,
+  which must be one of ours, e.g. `opening:ows:model:champions/imitation-v1.pt`.
 - `catanatron:<spec>`: a built-in bot by registry spec, e.g. `catanatron:F`,
   `catanatron:AB:2`, `catanatron:W`. These receive the full engine `Game` and
   are therefore privileged (rules matrix H-01); results label them so.
@@ -32,6 +35,7 @@ catanatron.players.playouts.USE_MULTIPROCESSING = False
 
 ENGINE_PREFIX = "catanatron:"
 MODEL_PREFIX = "model:"
+OPENING_PREFIX = "opening:"
 AGENTS: dict[str, Callable[[str], Agent]] = {
     "random": RandomAgent,
     "random-trader": RandomTraderAgent,
@@ -61,8 +65,23 @@ class Contestant:
             REGISTRY.lookup(self.engine_spec.split(":")[0])  # fail fast on unknown codes
         elif self.is_model:
             load_policy(self.name.removeprefix(MODEL_PREFIX))  # fail fast on bad checkpoints
+        elif self.is_opening:
+            from catan_ai.opening.priors import RULES
+
+            rule, inner = self.opening_parts
+            if rule not in RULES:
+                raise ValueError(f"Unknown opening rule {rule!r}; known: {', '.join(RULES)}")
+            if Contestant(inner).is_engine_bot:
+                raise ValueError(f"{self.name!r}: engine bots act engine-side, cannot be wrapped")
         elif self.name not in AGENTS:
-            known = ", ".join([*AGENTS, f"{MODEL_PREFIX}<checkpoint>", f"{ENGINE_PREFIX}<code>"])
+            known = ", ".join(
+                [
+                    *AGENTS,
+                    f"{MODEL_PREFIX}<checkpoint>",
+                    f"{OPENING_PREFIX}<rule>:<agent>",
+                    f"{ENGINE_PREFIX}<code>",
+                ]
+            )
             raise ValueError(f"Unknown contestant {self.name!r}. Known: {known}")
 
     @property
@@ -72,6 +91,16 @@ class Contestant:
     @property
     def is_model(self) -> bool:
         return self.name.startswith(MODEL_PREFIX)
+
+    @property
+    def is_opening(self) -> bool:
+        return self.name.startswith(OPENING_PREFIX)
+
+    @property
+    def opening_parts(self) -> tuple[str, str]:
+        """(rule, inner agent spec) of an `opening:` contestant."""
+        rule, _, inner = self.name.removeprefix(OPENING_PREFIX).partition(":")
+        return rule, inner
 
     @property
     def privileged(self) -> bool:
@@ -88,6 +117,11 @@ class Contestant:
         return SimplePlayer(color)
 
     def make_agent(self, seed: str) -> Agent:
+        if self.is_opening:
+            from catan_ai.opening.agent import OpeningRuleAgent
+
+            rule, inner = self.opening_parts
+            return OpeningRuleAgent(rule, Contestant(inner).make_agent(seed))
         if self.is_model:
             return PolicyAgent(load_policy(self.name.removeprefix(MODEL_PREFIX)), seed=seed)
         return AGENTS[self.name](seed)

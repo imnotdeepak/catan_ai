@@ -133,3 +133,23 @@ def test_parallel_tournament_matches_serial() -> None:
     serial = run_tournament(lineup, boards=2, base_seed=40)
     parallel = run_tournament(lineup, boards=2, base_seed=40, workers=3)
     assert [timeless(r) for r in serial] == [timeless(r) for r in parallel]
+
+
+def test_opening_contestants_wrap_our_agents() -> None:
+    from catan_ai.opening.agent import OpeningRuleAgent
+
+    agent = Contestant("opening:ows:heuristic").make_agent("s")
+    assert isinstance(agent, OpeningRuleAgent)
+    assert agent.rule == "ows"
+    with pytest.raises(ValueError, match="rule"):
+        Contestant("opening:nope:heuristic")
+    with pytest.raises(ValueError, match="cannot be wrapped"):
+        Contestant("opening:ows:catanatron:F")
+    with pytest.raises(ValueError, match="Unknown contestant"):
+        Contestant("opening:ows:nonsense")
+
+
+def test_opening_contestant_plays_a_game(tmp_path: Path) -> None:
+    lineup = [Contestant("opening:road:random"), *[Contestant("random")] * 3]
+    results = run_tournament(lineup, 1, 7, out_dir=tmp_path)
+    assert all(r.error is None for r in results)

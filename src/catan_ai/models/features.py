@@ -9,19 +9,53 @@ This is feature version 1, the Release 0.2 baseline (plan §9.2). Later versions
 append blocks to it; see `encoding.py`.
 
 Board topology (tile coordinates, node ids, edges) is Catanatron's static base
-map. It is public, identical on every board, and checked by tests.
+map (`catan_ai.engine.topology`), re-exported here.
 """
 
 from collections import defaultdict
 from typing import Final
 
 import numpy as np
-from catanatron.models.map import TOURNAMENT_MAP
 
 from catan_ai.engine.actions import RESOURCES, ActionKind, CanonicalAction
+from catan_ai.engine.topology import (
+    EDGE_INDEX,
+    EDGES,
+    NUM_EDGES,
+    NUM_NODES,
+    NUM_SEATS,
+    NUM_TILES,
+    PORT_KINDS,
+    TILE_COORDS,
+    TILE_INDEX,
+    TILE_NODES,
+    TILE_RESOURCES,
+    pips,
+)
 from catan_ai.observations import DEV_CARDS, PlayerObservation
 
-NUM_SEATS: Final = 4
+__all__ = [
+    "ACTION_DIM",
+    "ACTION_KINDS",
+    "EDGES",
+    "EDGE_INDEX",
+    "NUM_EDGES",
+    "NUM_NODES",
+    "NUM_SEATS",
+    "NUM_TILES",
+    "PORT_KINDS",
+    "PROMPTS",
+    "PROMPT_SLICE",
+    "STATE_DIM",
+    "TILE_COORDS",
+    "TILE_INDEX",
+    "TILE_NODES",
+    "TILE_RESOURCES",
+    "BoardContext",
+    "encode_actions",
+    "encode_state",
+    "pips",
+]
 
 PROMPTS: Final = (
     "BUILD_INITIAL_SETTLEMENT",
@@ -33,23 +67,6 @@ PROMPTS: Final = (
     "DECIDE_ACCEPTEES",
 )
 ACTION_KINDS: Final = tuple(ActionKind)
-TILE_RESOURCES: Final = (*RESOURCES, None)  # None = desert
-PORT_KINDS: Final = (None, *RESOURCES)  # None = 3:1
-
-# ----- Static topology
-
-TILE_COORDS: Final = tuple(sorted(tuple(c) for c in TOURNAMENT_MAP.land_tiles))
-TILE_NODES: Final = {
-    tuple(c): tuple(sorted(t.nodes.values())) for c, t in TOURNAMENT_MAP.land_tiles.items()
-}
-EDGES: Final = tuple(
-    sorted({tuple(sorted(e)) for t in TOURNAMENT_MAP.land_tiles.values() for e in t.edges.values()})
-)
-NUM_TILES: Final = len(TILE_COORDS)
-NUM_NODES: Final = 54
-NUM_EDGES: Final = len(EDGES)
-TILE_INDEX: Final = {c: i for i, c in enumerate(TILE_COORDS)}
-EDGE_INDEX: Final = {e: i for i, e in enumerate(EDGES)}
 
 # ----- State layout
 
@@ -97,11 +114,6 @@ ACTION_DIM: Final = (
     + 1
     + NUM_SEATS  # robber tile: resource, pips, buildings exposed by seat
 )
-
-
-def pips(number: int | None) -> int:
-    """Ways to roll `number` with two dice (0 for the desert)."""
-    return 0 if number is None else 6 - abs(7 - number)
 
 
 class BoardContext:

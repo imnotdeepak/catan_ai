@@ -167,7 +167,10 @@ Training and arena runs use the firewalled path; only search internals may use t
 |---|---|---|---|
 | 0.1 Rules + Arena | 2026-10-28 | 6 weeks, target 2026-12-09; cut to exit gate if unfinished by 2026-12-30 (+50%) | **Complete 2026-10-28**: exit gate passed (`reports/baseline_report.md`), ladder in `reports/ladder.md` |
 | 0.2 Learning baseline | 2026-10-28 | 4 weeks, target 2026-11-25; cut to exit gate if unfinished by 2026-12-09 (+50%) | **Complete 2026-10-28**: champion `champions/imitation-v1.pt`, `reports/imitation_training.md`, `reports/evaluation_0.2.md` |
+| 0.3 Openings + Victory | 2026-10-28 | 6 weeks, target 2026-12-09; cut to exit gate if unfinished by 2026-12-30 (+50%) | In progress: STR-016 done (`catan_ai.opening.board`, features v2) |
 
 Release 0.1 timebox assumes roughly 10–15 hours/week. Estimate by task: ENG-003 3–4 days; ENG-004 ~1 week; ENG-005/006 1.5–2 weeks; ENG-007 1–2 days; ENG-008 3–5 days; ENG-009 1–2 days; ENG-010 2–3 days; ENG-011 1–2 days.
 
 Release 0.2 estimate by task: ML-012 3–5 days; ML-013 3–5 days; ML-014 1 week; ML-015 2–3 days.
+
+Release 0.3 estimate by task: STR-016 3–5 days; STR-017 1 week; STR-018 1–2 weeks; STR-019 3–5 days; STR-020 1.5–2 weeks; STR-021 1 week. Every component is measured as an ablation against the current champion (plan §11.2); the exit gate needs a statistically supported gain over the 0.2 baseline.

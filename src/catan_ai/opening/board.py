@@ -22,7 +22,7 @@ from typing import Final
 import numpy as np
 
 from catan_ai.engine.actions import RESOURCES
-from catan_ai.models.features import EDGES, NUM_NODES, NUM_SEATS, PORT_KINDS, TILE_NODES, pips
+from catan_ai.engine.topology import EDGES, NUM_NODES, NUM_SEATS, PORT_KINDS, TILE_NODES, pips
 from catan_ai.observations import PlayerObservation
 
 UNREACHABLE: Final = 99
