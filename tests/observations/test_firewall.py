@@ -205,3 +205,10 @@ def test_legal_actions_only_for_the_deciding_seat() -> None:
     for seat in range(4):
         obs = referee.observe(seat)
         assert bool(obs.legal_actions) == (seat == current)
+
+
+def test_finished_games_offer_no_legal_actions(finished_games: list[Referee]) -> None:
+    for referee in finished_games:
+        assert referee.adapter.is_over or referee.adapter.num_turns > 0
+        if referee.adapter.is_over:
+            assert all(not referee.observe(s).legal_actions for s in range(4))

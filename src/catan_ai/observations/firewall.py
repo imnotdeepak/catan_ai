@@ -82,7 +82,7 @@ class PlayerObservation:
     own_resources: tuple[int, ...]  # RESOURCES order
     own_dev_cards: tuple[int, ...]  # DEV_CARDS order, unplayed
     history: tuple[VisibleEvent, ...]
-    legal_actions: tuple[CanonicalAction, ...]  # empty unless seat == current_seat
+    legal_actions: tuple[CanonicalAction, ...]  # empty unless seat == current_seat and game on
 
 
 class Referee:
@@ -162,7 +162,11 @@ class Referee:
             own_resources=tuple(int(ps[f"{own}_{r}_IN_HAND"]) for r in RESOURCES),
             own_dev_cards=tuple(int(ps[f"{own}_{d}_IN_HAND"]) for d in DEV_CARDS),
             history=self.visible_history(seat),
-            legal_actions=adapter.legal_actions() if seat == adapter.current_seat else (),
+            legal_actions=(
+                adapter.legal_actions()
+                if seat == adapter.current_seat and not adapter.is_over
+                else ()
+            ),
         )
 
     def _record(self, event: Event) -> None:

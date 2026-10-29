@@ -8,7 +8,7 @@ Maps each base-game rule to the Catanatron code that implements it, the test tha
 | Rulebook | https://www.catan.com/sites/default/files/2025-03/CN3081%20CATAN%E2%80%93The%20Game%20Rulebook%20secure%20%281%29.pdf |
 | Engine | Fork `imnotdeepak/catanatron`, branch `catan-ai-fixes` at `25f3599`: upstream `ecf9311` (v3.3.0) plus four rule fixes, one bot fix and one determinism fix (ADR-001, ADR-005). Audit performed on upstream `ecf9311` |
 | Audited | 2026-10-28 |
-| Tests | `tests/rules/test_conforming_rules.py` (R rows), `tests/rules/test_known_deviations.py` (D rows: regression tests once fixed, strict xfail while open) |
+| Tests | `tests/rules/test_conforming_rules.py` (R rows), `tests/rules/test_known_deviations.py` (D rows: regression tests once fixed, strict xfail while open), `tests/victory/test_score.py` (R-14, R-19, R-20 and scoring, STR-019) |
 
 **Status key:** **Pass** = test passes. **Inspected** = checked by reading code; test still to write. **Fixed** = upstream deviation patched in the fork; its test is now a regression test. **Open** = still deviates; strict-xfail test asserts the correct rule.
 
@@ -33,13 +33,13 @@ The plan expected Catanatron to follow pre-2025 rules. Inspection shows its turn
 | R-11 | A dev card may be played before rolling or during the Action phase | p.6, p.9 | `models/actions.py` `generate_playable_actions` | `test_r11_dev_card_playable_before_rolling` | Pass |
 | R-12 | Dev cards never return to the supply; none can be built once it runs out | p.9 | `generate_playable_actions` (`len(development_listdeck) > 0`) | — | Inspected |
 | R-13 | Monopoly: all cards of one type from each player. Invention: any 2 cards from supply. Road Building: 2 free roads | p.9 | `apply_play_monopoly`, `apply_play_year_of_plenty`, `apply_play_road_building` | — | Inspected (see Q-03) |
-| R-14 | VP cards stay hidden; they count toward 10, including ones built this turn | p.9–10 | `state_functions.py` `buy_dev_card` (`ACTUAL_VICTORY_POINTS`) | — | Inspected |
+| R-14 | VP cards stay hidden; they count toward 10, including ones built this turn | p.9–10 | `state_functions.py` `buy_dev_card` (`ACTUAL_VICTORY_POINTS`) | `tests/victory/test_score.py::test_vp_card_counts_at_once_and_wins_on_own_turn` | Pass |
 | R-15 | Turn = Production phase, then Action phase with trades and builds in any order; trading only after rolling; other players trade only with the active player | p.6–7 | `generate_playable_actions`; `game.py` `is_valid_action` | `test_r15_trades_require_roll_and_no_inactive_player_trades` | Pass |
 | R-16 | Maritime trade: 4:1, 3:1 port, 2:1 matching port, for a different resource from the supply | p.7 | `models/actions.py` `inner_maritime_trade_possibilities` | — | Inspected |
 | R-17 | Domestic trade: no giving cards away, no trading matching resources | p.7 | `game.py` `is_valid_trade` | — | Inspected |
 | R-18 | Placement: roads connect to own road/building and not past an opponent's building; settlements obey the distance rule and connect to own road; city replaces own settlement and the settlement piece returns | p.8–9 | `models/board.py` `buildable_edges`, `buildable_node_ids`, `build_city`; `state_functions.py` `build_city` | — | Inspected |
-| R-19 | Largest Army: first to 3 knights; another player must have **more** to take it | p.9 | `state_functions.py` `maintain_largest_army` | — | Inspected |
-| R-20 | Longest Route when building: first to 5 continuous roads; another player must have **more** to take it | p.8 | `models/board.py` `build_road` | — | Inspected |
+| R-19 | Largest Army: first to 3 knights; another player must have **more** to take it | p.9 | `state_functions.py` `maintain_largest_army` | `tests/victory/test_score.py::test_largest_army_engine_threshold_and_transfer`, `test_army_prediction_matches_the_engine_on_played_knights` | Pass |
+| R-20 | Longest Route when building: first to 5 continuous roads; another player must have **more** to take it | p.8 | `models/board.py` `build_road` | `tests/victory/test_score.py::test_road_award_prediction_matches_the_engine_on_new_roads` (where the Q-05 convention does not apply) | Pass |
 | R-21 | Number discs placed in A-B-C order counterclockwise from a corner, skipping the desert; robber starts on the desert | p.11 | `models/map.py` `initialize_tiles` (`official_spiral`); `Board.__init__` | — | Inspected |
 
 ## Deviations
