@@ -49,6 +49,7 @@ MAX_ROADS_TO_SITE: Final = 3
 MAX_ROUNDS: Final = 60.0  # "not within the horizon"
 KNIGHTS_IN_DECK: Final = 14
 DECK_SIZE: Final = 25
+BISECTIONS: Final = 14  # 60 rounds / 2^14: about 0.004-round precision
 
 
 @dataclass(frozen=True)
@@ -129,7 +130,7 @@ def rounds_to_afford_all(
     now = affordable(np.zeros(k))
     ever = affordable(np.full(k, MAX_ROUNDS))
     low, high = np.zeros(k), np.full(k, MAX_ROUNDS)
-    for _ in range(20):
+    for _ in range(BISECTIONS):
         mid = (low + high) / 2
         ok = affordable(mid)
         high = np.where(ok, mid, high)
@@ -240,14 +241,16 @@ def plan_for(
     seat: int,
     analysis: BoardAnalysis | None = None,
     points: int | None = None,
+    hand: np.ndarray | None = None,
 ) -> Plan:
     """`seat`'s route to 10 from `points` (default: the viewer's exact score, or an
-    opponent's visible score, i.e. assuming it holds no VP cards)."""
+    opponent's visible score, i.e. assuming it holds no VP cards) and `hand`
+    (default: the viewer's own, or an opponent's estimate)."""
     analysis = analysis if analysis is not None else analyze(observation)
     if points is None:
         low, high = points_range(observation, seat)
         points = low if seat != observation.seat else high
-    hand = estimated_hand(observation, seat, analysis)
+    hand = estimated_hand(observation, seat, analysis) if hand is None else hand.astype(np.float32)
     built: list[int] = []
     taken: set[int] = set()
     remaining = objectives(observation, analysis, seat)

@@ -30,10 +30,13 @@ from catan_ai.beliefs.resources import (
     check,
     initial_belief,
 )
+from catan_ai.engine import ActionKind
 from catan_ai.observations import PlayerObservation
 from catan_ai.observations.events import VisibleEvent
 
 DEFAULT_BUDGET: Final = 4096
+# Events after which no offer is on the table.
+TRADE_ENDS: Final = {ActionKind.CONFIRM_TRADE, ActionKind.CANCEL_TRADE, ActionKind.END_TURN}
 MAX_RECOVERIES: Final = 3
 EXACT, ENUMERATED, PARTICLES = 1, 2, 3
 
@@ -64,6 +67,7 @@ class BeliefTracker:
         self._last: VisibleEvent | None = None
         self._approximate = False
         self._active_budget = budget
+        self._trade: tuple[int, ...] | None = None  # receive vector of the offer on the table
 
     @property
     def belief(self) -> ResourceBelief:
@@ -95,7 +99,11 @@ class BeliefTracker:
 
     def _advance(self, history: tuple[VisibleEvent, ...]) -> None:
         for event in history[self._seen :]:
-            self._belief = apply_event(self._belief, event)
+            self._belief = apply_event(self._belief, event, self._trade)
+            if event.event_type == ActionKind.OFFER_TRADE:
+                self._trade = tuple(event.public["action"]["params"][1])
+            elif event.event_type in TRADE_ENDS:
+                self._trade = None
             if self._belief.size > self._active_budget:
                 rng = np.random.default_rng((self.seed, self.recoveries, event.sequence_id))
                 self._belief = resample(self._belief, self._active_budget, rng)

@@ -61,6 +61,28 @@ def test_seen_steals_and_merging_keep_the_ledger_exact() -> None:
     assert twice.size == 3 and twice.weights.sum() == pytest.approx(1)
 
 
+def test_monopoly_leaves_the_others_with_none() -> None:
+    from catan_ai.beliefs.resources import apply_event
+    from catan_ai.observations.events import VisibleEvent
+
+    # Seat 1 holds 3 or 4 wheat; seat 0's Monopoly takes 3, so it held exactly 3.
+    belief = ResourceBelief(
+        np.array([[ZERO, (0, 0, 0, 3, 0), ZERO, ZERO], [ZERO, (0, 0, 0, 4, 0), ZERO, ZERO]],
+                 dtype=np.int16),
+        np.array([0.5, 0.5]),
+        np.zeros((2, 0), np.int8),
+    )  # fmt: skip
+    delta = ((0, 0, 0, 3, 0), (0, 0, 0, -3, 0), ZERO, ZERO)
+    event = VisibleEvent(
+        0, 9, 0, "PLAY_MONOPOLY",
+        {"action": {"kind": "PLAY_MONOPOLY", "seat": 0, "params": ("WHEAT",)},
+         "resource_delta": delta},
+        None,
+    )  # fmt: skip
+    after = apply_event(belief, event)
+    assert after.exact and after.prob_of(1, ZERO) == 1.0
+
+
 def test_impossible_public_change_is_a_conservation_failure() -> None:
     spend = np.zeros((4, 5), dtype=np.int16)
     spend[2, 4] = -1

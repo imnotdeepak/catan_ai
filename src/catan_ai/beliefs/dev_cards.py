@@ -8,14 +8,15 @@ hypergeometric.
 
 Holding is evidence. VP cards are never played, while other cards tend to be
 played once they can be, so cards held unplayed for many turns are more
-likely VP cards. A non-VP card is either hoarded (held on purpose, with
-probability `hoard`) or played at rate `play_rate` per turn its owner could
-have played it and did not; so after `e` such turns it is still held with
-probability hoard + (1 - hoard)(1 - play_rate)^e. Exposure is counted per
-card (played cards leave first-in, first-out) and averaged over the hand.
-Both parameters are fitted on recorded games (`reports/beliefs.md`); other
-opponents may play faster or slower, which the opponent model (OPP-025) can
-refine.
+likely VP cards. And an opponent still playing holds fewer VP cards than
+would bring it to 10 points: it would already have won. A non-VP card is
+either hoarded (held on purpose, with probability `hoard`) or played at rate
+`play_rate` per turn its owner could have played it and did not; so after
+`e` such turns it is still held with probability hoard + (1 - hoard)(1 -
+play_rate)^e. Exposure is counted per card (played cards leave first-in,
+first-out) and averaged over the hand. Both parameters are fitted on
+recorded games (`reports/beliefs.md`); other opponents may play faster or
+slower, which the opponent model (OPP-025) can refine.
 """
 
 from dataclasses import dataclass
@@ -46,6 +47,8 @@ class DevBelief:
     viewer: int
     play_rate: float = PLAY_RATE
     hoard: float = HOARD
+    # Most VP cards each seat can hold: one more would have won the game (default: no cap).
+    max_hidden_vp: np.ndarray | None = None
 
     @property
     def pool_size(self) -> int:
@@ -63,6 +66,11 @@ class DevBelief:
         survive = self.hoard + (1 - self.hoard) * (1.0 - self.play_rate) ** per_card
         likelihood = np.array([survive ** (n - k) for k in range(n + 1)])
         posterior = prior * likelihood
+        if self.max_hidden_vp is not None:
+            capped = posterior.copy()
+            capped[int(self.max_hidden_vp[seat]) + 1 :] = 0.0
+            if capped.sum() > 0:  # at the game's end the winner may hold more
+                posterior = capped
         return np.asarray(posterior / posterior.sum())
 
     def expected(self, seat: int) -> np.ndarray:
@@ -149,4 +157,6 @@ def dev_belief(
             for s in range(len(hidden))
         ]
     )
-    return DevBelief(unseen, hidden, exposure, observation.seat, play_rate, hoard)
+    # At 10 points a seat wins at once on its own turn, so no opponent holds that many.
+    cap = np.array([max(0, 9 - p.visible_victory_points) for p in observation.players])
+    return DevBelief(unseen, hidden, exposure, observation.seat, play_rate, hoard, cap)

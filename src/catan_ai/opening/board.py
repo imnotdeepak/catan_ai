@@ -69,7 +69,23 @@ class BoardAnalysis:
         return _longest_road(seat, {**self.road_owner, edge: seat}, self.owner)
 
 
+_RECENT: list[tuple[PlayerObservation, "BoardAnalysis"]] = []
+RECENT_ANALYSES = 8
+
+
 def analyze(observation: PlayerObservation) -> BoardAnalysis:
+    """The board analysis of an observation. Analyses are pure functions of the
+    observation, so the last few are reused (by identity: the same object)."""
+    for seen, analysis in _RECENT:
+        if seen is observation:
+            return analysis
+    analysis = _analyze(observation)
+    _RECENT.insert(0, (observation, analysis))
+    del _RECENT[RECENT_ANALYSES:]
+    return analysis
+
+
+def _analyze(observation: PlayerObservation) -> BoardAnalysis:
     board = observation.board
     production = np.zeros((NUM_NODES, len(RESOURCES)), dtype=np.float32)
     blocked = np.zeros_like(production)

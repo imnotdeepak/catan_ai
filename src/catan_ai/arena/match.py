@@ -56,10 +56,12 @@ def play_match(
     seating: Sequence[Contestant],
     max_decisions: int = MAX_DECISIONS,
     observer: DecisionObserver | None = None,
+    agent_sink: dict[int, Any] | None = None,
 ) -> tuple[MatchResult, Referee]:
     """Play one game. Our agents see only their observations; engine bots see the game.
 
     `observer` (e.g. a dataset recorder) is not counted in decision time.
+    `agent_sink`, if given, receives our agents by seat (e.g. to read their logs).
     """
     started = time.perf_counter()
     referee = Referee.new_game(
@@ -71,6 +73,8 @@ def play_match(
         for seat, c in enumerate(seating)
         if not c.is_engine_bot
     }
+    if agent_sink is not None:
+        agent_sink.update(agents)
     decisions, seconds = [0] * 4, [0.0] * 4
     error = None
 

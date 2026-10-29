@@ -130,10 +130,39 @@ def apply_steal(
     return _merged(np.concatenate(branches), np.concatenate(weights), np.concatenate(histories))
 
 
-def apply_event(belief: ResourceBelief, event: VisibleEvent) -> ResourceBelief:
+def require(belief: ResourceBelief, seat: int, cards: np.ndarray) -> ResourceBelief:
+    """Keep the hypotheses where `seat` holds at least `cards`."""
+    keep = (belief.hands[:, seat, :] >= cards[None, :]).all(axis=1)
+    if not keep.any():
+        raise BeliefError(f"seat {seat} showed cards it holds under no hypothesis")
+    if keep.all():
+        return belief
+    return _normalized(belief.hands[keep], belief.weights[keep], belief.steals[keep])
+
+
+def apply_event(
+    belief: ResourceBelief, event: VisibleEvent, pending: tuple[int, ...] | None = None
+) -> ResourceBelief:
+    """Apply one event. `pending` is the trade on the table (the offer's receive
+    vector), needed for ACCEPT_TRADE: only a responder able to pay may accept."""
+    if event.event_type == ActionKind.ACCEPT_TRADE and pending is not None:
+        return require(belief, event.actor, np.asarray(pending))  # type: ignore[arg-type]
+    if event.event_type == ActionKind.OFFER_TRADE:
+        # Only a player holding the cards can offer them (rulebook p.7, D-07).
+        give = np.asarray(event.public["action"]["params"][0])
+        return require(belief, event.actor, give)  # type: ignore[arg-type]
     if "resource_delta" in event.public:
         delta = np.asarray(event.public["resource_delta"], dtype=np.int16)
-        return belief if not delta.any() else apply_delta(belief, delta)
+        belief = belief if not delta.any() else apply_delta(belief, delta)
+        if event.event_type == ActionKind.PLAY_MONOPOLY:
+            # Monopoly takes every card of the resource: afterwards the others hold none.
+            r = RESOURCES.index(event.public["action"]["params"][0])
+            others = [s for s in range(NUM_SEATS) if s != event.actor]
+            keep = (belief.hands[:, others, r] == 0).all(axis=1)
+            if not keep.any():
+                raise BeliefError("a Monopoly left cards under every hypothesis")
+            belief = _normalized(belief.hands[keep], belief.weights[keep], belief.steals[keep])
+        return belief
     if event.event_type == ActionKind.MOVE_ROBBER:
         params = event.public["action"]["params"]
         victim = params[1]

@@ -28,14 +28,14 @@ def test_rounds_to_afford() -> None:
     assert rounds_to_afford(CITY, np.array([0, 0, 0, 2, 3.0]), zero, FOUR) == 0.0
     assert rounds_to_afford(CITY, zero, zero, FOUR) == MAX_ROUNDS
     rate = np.array([0, 0, 0, 0.5, 0.5], dtype=np.float32)
-    assert rounds_to_afford(CITY, zero, rate, FOUR) == pytest.approx(6.0, abs=1e-3)
+    assert rounds_to_afford(CITY, zero, rate, FOUR) == pytest.approx(6.0, abs=0.01)
     # Only wood income: 4:1 trades for everything, faster with a 2:1 wood port.
     wood = np.array([1.0, 0, 0, 0, 0], dtype=np.float32)
     port = np.array([2.0, 4, 4, 4, 4], dtype=np.float32)
     slow = rounds_to_afford(SETTLEMENT, zero, wood, FOUR)
     fast = rounds_to_afford(SETTLEMENT, zero, wood, port)
     assert 0 < fast < slow < MAX_ROUNDS
-    assert slow == pytest.approx(13.0, abs=1e-3)  # 1 wood + 3 x 4 for brick, sheep, wheat
+    assert slow == pytest.approx(13.0, abs=0.01)  # 1 wood + 3 x 4 for brick, sheep, wheat
 
 
 def test_pay_trades_surpluses() -> None:

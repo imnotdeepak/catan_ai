@@ -13,11 +13,16 @@
   `draft-settle:<rule>:<spec>` searches settlements only and leaves roads to `<spec>`.
 - `defend:<spec>`: robber moves chosen to delay the opponent that threatens to
   win first (`catan_ai.victory.threats`), every other decision by `<spec>`.
+- `negotiator:<style>:<spec>`: one of the five negotiator baselines
+  (`catan_ai.trading.negotiators.STYLES`), every non-trade decision by `<spec>`.
+- `trader:<mode>:<spec>`: the trading agent (`catan_ai.trading.agent`), mode
+  `rules` or `model`, every non-trade decision by `<spec>`.
 - `catanatron:<spec>`: a built-in bot by registry spec, e.g. `catanatron:F`,
   `catanatron:AB:2`, `catanatron:W`. These receive the full engine `Game` and
   are therefore privileged (rules matrix H-01); results label them so.
 """
 
+import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cache
@@ -43,11 +48,17 @@ MODEL_PREFIX = "model:"
 # Wrappers that take over initial placement: "<prefix><rule>:<inner agent spec>".
 OPENING_PREFIXES = ("opening:", "draft:", "draft-settle:")
 DEFEND_PREFIX = "defend:"
+# Wrappers with an option: "<prefix><option>:<inner agent spec>".
+TRADE_PREFIXES = ("negotiator:", "trader:")
 AGENTS: dict[str, Callable[[str], Agent]] = {
     "random": RandomAgent,
     "random-trader": RandomTraderAgent,
     "heuristic": lambda seed: PolicyAgent(HeuristicPolicyValue(), seed=seed),
 }
+
+
+def _seed_int(seed: str) -> int:
+    return int(hashlib.sha256(seed.encode()).hexdigest()[:8], 16)
 
 
 @cache
@@ -72,6 +83,13 @@ class Contestant:
             REGISTRY.lookup(self.engine_spec.split(":")[0])  # fail fast on unknown codes
         elif self.is_model:
             load_policy(self.name.removeprefix(MODEL_PREFIX))  # fail fast on bad checkpoints
+        elif self.is_trading:
+            option, inner = self.opening_parts
+            options = self._trade_options()
+            if option not in options:
+                raise ValueError(f"Unknown option {option!r} for {self.name!r}; known: {options}")
+            if Contestant(inner).is_engine_bot:
+                raise ValueError(f"{self.name!r}: engine bots act engine-side, cannot be wrapped")
         elif self.is_defend:
             if Contestant(self.defend_inner).is_engine_bot:
                 raise ValueError(f"{self.name!r}: engine bots act engine-side, cannot be wrapped")
@@ -90,6 +108,7 @@ class Contestant:
                     f"{MODEL_PREFIX}<checkpoint>",
                     *(f"{p}<rule>:<agent>" for p in OPENING_PREFIXES),
                     f"{DEFEND_PREFIX}<agent>",
+                    *(f"{p}<option>:<agent>" for p in TRADE_PREFIXES),
                     f"{ENGINE_PREFIX}<code>",
                 ]
             )
@@ -102,6 +121,17 @@ class Contestant:
     @property
     def is_model(self) -> bool:
         return self.name.startswith(MODEL_PREFIX)
+
+    @property
+    def is_trading(self) -> bool:
+        return self.name.startswith(TRADE_PREFIXES)
+
+    def _trade_options(self) -> tuple[str, ...]:
+        if self.name.startswith("negotiator:"):
+            from catan_ai.trading.negotiators import STYLES
+
+            return tuple(STYLES)
+        return ("rules", "model")
 
     @property
     def is_defend(self) -> bool:
@@ -137,6 +167,16 @@ class Contestant:
         return SimplePlayer(color)
 
     def make_agent(self, seed: str) -> Agent:
+        if self.is_trading:
+            option, inner = self.opening_parts
+            agent = Contestant(inner).make_agent(seed)
+            if self.name.startswith("negotiator:"):
+                from catan_ai.trading.negotiators import NegotiatorAgent
+
+                return NegotiatorAgent(option, agent)
+            from catan_ai.trading.agent import TradingAgent
+
+            return TradingAgent(agent, mode=option, seed=_seed_int(seed))  # type: ignore[arg-type]
         if self.is_defend:
             from catan_ai.victory.threats import DefendAgent
 

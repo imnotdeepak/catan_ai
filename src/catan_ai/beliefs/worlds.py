@@ -24,6 +24,7 @@ and search use them to see the game from another seat's information state.
 """
 
 import random
+from collections.abc import Callable
 from typing import Any, Final
 
 from catanatron import Game
@@ -38,9 +39,10 @@ from catan_ai.beliefs.resources import ResourceBelief
 from catan_ai.engine import SEAT_COLORS, ActionKind, CanonicalAction, EngineAdapter
 from catan_ai.engine.actions import RESOURCES
 from catan_ai.observations import DEV_CARDS, PlayerObservation
-from catan_ai.observations.events import PLAY_KINDS, VisibleEvent
+from catan_ai.observations.events import PLAY_KINDS, EventType, VisibleEvent
 
 DEFAULT_WORLDS: Final = 8
+MAX_ASSIGNMENTS: Final = 200
 
 
 class Contradiction(Exception):
@@ -153,8 +155,24 @@ def dev_assignment(observation: PlayerObservation, rng: random.Random) -> dict[i
 
     Every card an opponent played is assigned to one of its purchases from an
     earlier turn; cards still face down get a VP count from the hold-time
-    posterior, the rest drawn from the unseen non-VP pool.
+    posterior, the rest drawn from the unseen non-VP pool. An assignment that
+    would have put an opponent at 10 points at any moment of the game so far
+    (it would have won) is drawn again.
     """
+    timeline = _visible_points(observation)
+    over = any(e.event_type == EventType.GAME_END for e in observation.history)
+    assigned: dict[int, str] = {}
+    for _ in range(MAX_ASSIGNMENTS):
+        try:
+            assigned = _draw_assignment(observation, rng)
+        except Contradiction:
+            continue
+        if over or _never_won(observation, assigned, timeline):
+            return assigned
+    return assigned
+
+
+def _draw_assignment(observation: PlayerObservation, rng: random.Random) -> dict[int, str]:
     belief = dev_belief(observation)
     unseen = {card: int(n) for card, n in zip(DEV_CARDS, belief.unseen, strict=True)}
     assigned: dict[int, str] = {}
@@ -175,9 +193,13 @@ def dev_assignment(observation: PlayerObservation, rng: random.Random) -> dict[i
             assigned[pick[0]] = card
     for seat, cards in sorted(pending.items()):
         vp = belief.hidden_vp_distribution(seat)
-        k = min(rng.choices(range(len(vp)), weights=list(vp))[0], unseen["VICTORY_POINT"])
-        unseen["VICTORY_POINT"] -= k
         others = [c for c, n in unseen.items() if c != "VICTORY_POINT" for _ in range(n)]
+        low = max(0, len(cards) - len(others))  # not enough other cards left: some are VP
+        high = min(len(cards), unseen["VICTORY_POINT"])
+        if low > high:
+            raise Contradiction("the unseen cards cannot fill this seat's hand")
+        k = min(max(rng.choices(range(len(vp)), weights=list(vp))[0], low), high)
+        unseen["VICTORY_POINT"] -= k
         drawn = rng.sample(others, len(cards) - k)
         for card in drawn:
             unseen[card] -= 1
@@ -186,6 +208,34 @@ def dev_assignment(observation: PlayerObservation, rng: random.Random) -> dict[i
         for (sequence, _), card in zip(cards, types, strict=True):
             assigned[sequence] = card
     return assigned
+
+
+def _visible_points(observation: PlayerObservation) -> list[tuple[int, ...]]:
+    """Each seat's visible points after each event (buildings and awards)."""
+    points = [0] * 4
+    timeline = []
+    for event in observation.history:
+        if event.event_type in (ActionKind.BUILD_SETTLEMENT, ActionKind.BUILD_CITY):
+            points[event.actor] += 1  # type: ignore[index]  # a city replaces 1 point with 2
+        elif event.event_type == EventType.BONUS_TRANSFER:
+            if event.public["from_seat"] is not None:
+                points[event.public["from_seat"]] -= 2
+            if event.public["to_seat"] is not None:
+                points[event.public["to_seat"]] += 2
+        timeline.append(tuple(points))
+    return timeline
+
+
+def _never_won(
+    observation: PlayerObservation, assigned: dict[int, str], timeline: list[tuple[int, ...]]
+) -> bool:
+    held = [0] * 4
+    for index, event in enumerate(observation.history):
+        if assigned.get(event.sequence_id) == "VICTORY_POINT" and event.actor is not None:
+            held[event.actor] += 1
+        if any(timeline[index][s] + held[s] >= 10 for s in range(4) if s != observation.seat):
+            return False
+    return True
 
 
 def build_world(
@@ -226,7 +276,13 @@ class WorldSampler:
     def worlds(self) -> list[EngineAdapter]:
         return self._worlds
 
-    def update(self, observation: PlayerObservation) -> list[EngineAdapter]:
+    def update(
+        self,
+        observation: PlayerObservation,
+        before: Callable[[VisibleEvent, list[EngineAdapter]], None] | None = None,
+    ) -> list[EngineAdapter]:
+        """Advance to the observation. `before(event, worlds)` sees each new event with
+        the worlds as they were just before it (not for events skipped by a rebuild)."""
         if observation.seat != self.seat:
             raise ValueError(f"sampler for seat {self.seat} got seat {observation.seat}")
         belief = self.tracker.update(observation)
@@ -238,6 +294,8 @@ class WorldSampler:
             self._rebuild(observation, belief)
             return self._worlds
         for event in history[self._seen :]:
+            if before is not None:
+                before(event, self._worlds)
             survivors = []
             for world in self._worlds:
                 try:
