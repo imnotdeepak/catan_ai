@@ -136,8 +136,8 @@ def main(argv: list[str] | None = None) -> int:
 
     full = json.loads(args.config.read_text(encoding="utf-8"))
     settings = full["training"]
-    args.data = args.data or REPO_ROOT / "data" / full["name"]
-    args.out = args.out or REPO_ROOT / "checkpoints" / full["name"]
+    args.data = (args.data or REPO_ROOT / "data" / full["name"]).resolve()
+    args.out = (args.out or REPO_ROOT / "checkpoints" / full["name"]).resolve()
     manifest_bytes = (args.data / "manifest.json").read_bytes()
     manifest = json.loads(manifest_bytes)
     data_sha = hashlib.sha256(manifest_bytes).hexdigest()

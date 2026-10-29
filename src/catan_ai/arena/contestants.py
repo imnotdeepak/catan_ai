@@ -8,6 +8,9 @@
 - `opening:<rule>:<spec>`: initial settlements by an opening rule
   (`catan_ai.opening.priors.RULES`), every other decision by the agent `<spec>`,
   which must be one of ours, e.g. `opening:ows:model:champions/imitation-v1.pt`.
+- `draft:<rule>:<spec>`: initial settlements and roads by pair search over the
+  predicted snake draft (`catan_ai.opening.draft`), scored by `<rule>`;
+  `draft-settle:<rule>:<spec>` searches settlements only and leaves roads to `<spec>`.
 - `catanatron:<spec>`: a built-in bot by registry spec, e.g. `catanatron:F`,
   `catanatron:AB:2`, `catanatron:W`. These receive the full engine `Game` and
   are therefore privileged (rules matrix H-01); results label them so.
@@ -35,7 +38,8 @@ catanatron.players.playouts.USE_MULTIPROCESSING = False
 
 ENGINE_PREFIX = "catanatron:"
 MODEL_PREFIX = "model:"
-OPENING_PREFIX = "opening:"
+# Wrappers that take over initial placement: "<prefix><rule>:<inner agent spec>".
+OPENING_PREFIXES = ("opening:", "draft:", "draft-settle:")
 AGENTS: dict[str, Callable[[str], Agent]] = {
     "random": RandomAgent,
     "random-trader": RandomTraderAgent,
@@ -78,7 +82,7 @@ class Contestant:
                 [
                     *AGENTS,
                     f"{MODEL_PREFIX}<checkpoint>",
-                    f"{OPENING_PREFIX}<rule>:<agent>",
+                    *(f"{p}<rule>:<agent>" for p in OPENING_PREFIXES),
                     f"{ENGINE_PREFIX}<code>",
                 ]
             )
@@ -94,12 +98,13 @@ class Contestant:
 
     @property
     def is_opening(self) -> bool:
-        return self.name.startswith(OPENING_PREFIX)
+        return self.name.startswith(OPENING_PREFIXES)
 
     @property
     def opening_parts(self) -> tuple[str, str]:
-        """(rule, inner agent spec) of an `opening:` contestant."""
-        rule, _, inner = self.name.removeprefix(OPENING_PREFIX).partition(":")
+        """(rule, inner agent spec) of an opening wrapper."""
+        rest = self.name.split(":", 1)[1]
+        rule, _, inner = rest.partition(":")
         return rule, inner
 
     @property
@@ -119,9 +124,13 @@ class Contestant:
     def make_agent(self, seed: str) -> Agent:
         if self.is_opening:
             from catan_ai.opening.agent import OpeningRuleAgent
+            from catan_ai.opening.draft import DraftSearchAgent
 
             rule, inner = self.opening_parts
-            return OpeningRuleAgent(rule, Contestant(inner).make_agent(seed))
+            agent = Contestant(inner).make_agent(seed)
+            if self.name.startswith("opening:"):
+                return OpeningRuleAgent(rule, agent)
+            return DraftSearchAgent(rule, agent, roads=self.name.startswith("draft:"))
         if self.is_model:
             return PolicyAgent(load_policy(self.name.removeprefix(MODEL_PREFIX)), seed=seed)
         return AGENTS[self.name](seed)
