@@ -1,0 +1,51 @@
+{
+  "description": "Release 0.3 evaluation: the features-v3 champion on the same tiers, boards and seeds as the Release 0.2 evaluation, so results compare directly with reports/evaluation_0.2.md.",
+  "model": "champions/imitation-features-v3.pt",
+  "tiers": [
+    {
+      "name": "weak",
+      "lineup": [
+        "model:champions/imitation-features-v3.pt",
+        "catanatron:W",
+        "catanatron:VP",
+        "catanatron:R"
+      ],
+      "boards": 100,
+      "seed": 400000
+    },
+    {
+      "name": "value-function",
+      "lineup": [
+        "model:champions/imitation-features-v3.pt",
+        "catanatron:F",
+        "catanatron:W",
+        "catanatron:VP"
+      ],
+      "boards": 100,
+      "seed": 410000
+    },
+    {
+      "name": "strong",
+      "lineup": [
+        "model:champions/imitation-features-v3.pt",
+        "catanatron:AB:2",
+        "catanatron:F",
+        "catanatron:W"
+      ],
+      "boards": 50,
+      "seed": 420000
+    },
+    {
+      "name": "random-trader",
+      "lineup": [
+        "model:champions/imitation-features-v3.pt",
+        "random-trader",
+        "catanatron:F",
+        "catanatron:W"
+      ],
+      "boards": 25,
+      "seed": 430000
+    }
+  ],
+  "title": "Release 0.3 Evaluation: features-v3 champion"
+}

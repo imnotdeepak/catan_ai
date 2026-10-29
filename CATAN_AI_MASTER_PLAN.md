@@ -729,7 +729,7 @@ Each task should become a GitHub issue with an owner, acceptance tests and a rep
 
 - [x] **STR-016:** Board graph/pip-production/port/road-network feature extractor.
 - [x] **STR-017:** Six opening strategy priors, comparison against pip heuristic.
-- [ ] **STR-018:** Opening settlement+road pair candidate search and remaining snake-draft prediction.
+- [x] **STR-018:** Opening settlement+road pair candidate search and remaining snake-draft prediction.
 - [ ] **STR-019:** Exact VP, city, road, army and dev timing tests.
 - [ ] **STR-020:** Victory AND/OR dependency graph with branch contingencies.
 - [ ] **STR-021:** Defensive action and turn-order threat tests.

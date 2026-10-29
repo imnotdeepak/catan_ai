@@ -4,7 +4,7 @@ Research AI for **standard four-player base Catan**, built on a pinned [Catanatr
 
 The design, release plan and backlog live in [CATAN_AI_MASTER_PLAN.md](CATAN_AI_MASTER_PLAN.md). Decisions are logged in [docs/architecture-decisions.md](docs/architecture-decisions.md).
 
-**Status:** Release 0.2 (learning baseline) complete. The first champion, `champions/imitation-v1.pt`, is a policy/value network trained by imitation from player-view inputs. It wins 87% against the weak reference bots and trails ValueFunction (`reports/evaluation_0.2.md`). Release 0.1 (Rules + Arena) provides the audited engine fork, observation firewall, arena and reference ladder. Next: Release 0.3 (openings and victory planning).
+**Status:** Release 0.3 (openings and victory) in progress. The champion is now `champions/imitation-features-v3.pt`: the same imitation network given board-analysis and opening-prior features. It beats the 0.2 champion in 63.1% of their head-to-head decided games (two training seeds, `reports/openings.md`). On the 0.2 ladder it wins 91.5% against the weak bots (0.2: 86.8%), 35.5% head to head with ValueFunction (0.2: 23.2%) and 16.5% in the strong tier (0.2: 14.0%) (`reports/evaluation_0.3.md`). STR-016 to STR-018 are done; next is exact victory accounting (STR-019).
 
 ## Setup
 
