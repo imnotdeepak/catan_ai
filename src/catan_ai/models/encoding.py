@@ -6,7 +6,8 @@ clean ablation step over the last:
 
 - v1: base player-view encoding (`features.py`, Release 0.2);
 - v2: + board analysis (`board_features.py`, STR-016);
-- v3: + opening-prior scores for settlement candidates (`prior_features.py`, STR-017).
+- v3: + opening-prior scores for settlement candidates (`prior_features.py`, STR-017);
+- v4: + victory-plan features for every seat and action (`plan_features.py`, STR-020).
 """
 
 from typing import Final
@@ -27,11 +28,17 @@ from catan_ai.models.features import (
     encode_actions,
     encode_state,
 )
+from catan_ai.models.plan_features import (
+    PLAN_ACTION_DIM,
+    PLAN_STATE_DIM,
+    plan_actions,
+    plan_state,
+)
 from catan_ai.models.prior_features import PRIOR_ACTION_DIM, prior_actions
 from catan_ai.observations import PlayerObservation
 from catan_ai.opening.board import analyze
 
-FEATURE_VERSIONS: Final = (1, 2, 3)
+FEATURE_VERSIONS: Final = (1, 2, 3, 4)
 LATEST_FEATURE_VERSION: Final = FEATURE_VERSIONS[-1]
 
 
@@ -43,7 +50,10 @@ def dims(version: int) -> tuple[int, int]:
     state, action = STATE_DIM + BOARD_STATE_DIM, ACTION_DIM + BOARD_ACTION_DIM
     if version == 2:
         return state, action
-    return state, action + PRIOR_ACTION_DIM
+    action += PRIOR_ACTION_DIM
+    if version == 3:
+        return state, action
+    return state + PLAN_STATE_DIM, action + PLAN_ACTION_DIM
 
 
 def check(version: int) -> None:
@@ -68,4 +78,8 @@ def encode(
         rows = np.hstack([rows, board_actions(observation, analysis, candidates)])
         if version >= 3:
             rows = np.hstack([rows, prior_actions(observation, analysis, candidates)])
+        if version >= 4:
+            extra, all_plans = plan_state(observation, analysis)
+            state = np.concatenate([state, extra])
+            rows = np.hstack([rows, plan_actions(observation, analysis, candidates, all_plans)])
     return state, rows
