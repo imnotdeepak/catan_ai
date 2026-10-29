@@ -46,7 +46,7 @@ def resample(belief: ResourceBelief, budget: int, rng: np.random.Generator) -> R
     picks = np.searchsorted(cumulative, points)
     counts = np.bincount(picks, minlength=belief.size)
     kept = np.flatnonzero(counts)
-    return ResourceBelief(belief.hands[kept], counts[kept] / budget)
+    return ResourceBelief(belief.hands[kept], counts[kept] / budget, belief.steals[kept])
 
 
 class BeliefTracker:

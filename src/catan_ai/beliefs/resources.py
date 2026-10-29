@@ -19,7 +19,7 @@ observation, raises `BeliefError`.
 Tier 3, the budgeted fallback (BEL-024), lives in `catan_ai.beliefs.particles`.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Final
 
 import numpy as np
@@ -37,10 +37,20 @@ class BeliefError(AssertionError):
 
 @dataclass(frozen=True)
 class ResourceBelief:
-    """A weighted set of joint hands, hands[k, seat, resource], weights summing to 1."""
+    """A weighted set of joint hands, hands[k, seat, resource], weights summing to 1.
+
+    `steals[k]` is one history of the unseen steals (resource index per steal, in
+    order) that leads to hypothesis k. Merged hypotheses keep one such history:
+    the future depends only on the current hands, so any consistent past serves
+    to rebuild a world (`catan_ai.beliefs.worlds`).
+    """
 
     hands: np.ndarray  # [K, seats, resources] int
     weights: np.ndarray  # [K] float64
+    steals: np.ndarray = field(default_factory=lambda: np.zeros((1, 0), dtype=np.int8))
+
+    def subset(self, keep: np.ndarray) -> "ResourceBelief":
+        return ResourceBelief(self.hands[keep], self.weights[keep], self.steals[keep])
 
     @property
     def size(self) -> int:
@@ -72,7 +82,9 @@ class ResourceBelief:
 
 def initial_belief() -> ResourceBelief:
     return ResourceBelief(
-        np.zeros((1, NUM_SEATS, NUM_RESOURCES), dtype=np.int16), np.ones(1, dtype=np.float64)
+        np.zeros((1, NUM_SEATS, NUM_RESOURCES), dtype=np.int16),
+        np.ones(1, dtype=np.float64),
+        np.zeros((1, 0), dtype=np.int8),
     )
 
 
@@ -82,7 +94,7 @@ def apply_delta(belief: ResourceBelief, delta: np.ndarray) -> ResourceBelief:
     keep = (hands >= 0).all(axis=(1, 2))
     if not keep.any():
         raise BeliefError("a public resource change is impossible under every hypothesis")
-    return _normalized(hands[keep], belief.weights[keep])
+    return _normalized(hands[keep], belief.weights[keep], belief.steals[keep])
 
 
 def apply_steal(
@@ -101,9 +113,9 @@ def apply_steal(
         keep = total > 0
         if not keep.any():
             raise BeliefError("a steal from a seat that holds no cards under every hypothesis")
-        belief = _normalized(belief.hands[keep], belief.weights[keep])
+        belief = _normalized(belief.hands[keep], belief.weights[keep], belief.steals[keep])
         held, total = held[keep], total[keep]
-    branches, weights = [], []
+    branches, weights, histories = [], [], []
     for r in range(NUM_RESOURCES):
         possible = held[:, r] > 0
         if not possible.any():
@@ -113,7 +125,9 @@ def apply_steal(
         hands[:, thief, r] += 1
         branches.append(hands)
         weights.append(belief.weights[possible] * held[possible, r] / total[possible])
-    return _merged(np.concatenate(branches), np.concatenate(weights))
+        past = belief.steals[possible]
+        histories.append(np.hstack([past, np.full((len(past), 1), r, dtype=np.int8)]))
+    return _merged(np.concatenate(branches), np.concatenate(weights), np.concatenate(histories))
 
 
 def apply_event(belief: ResourceBelief, event: VisibleEvent) -> ResourceBelief:
@@ -140,12 +154,13 @@ def check(belief: ResourceBelief, observation: PlayerObservation) -> None:
         raise BeliefError("a hypothesis disagrees with the viewer's own hand")
 
 
-def _normalized(hands: np.ndarray, weights: np.ndarray) -> ResourceBelief:
-    return ResourceBelief(hands, weights / weights.sum())
+def _normalized(hands: np.ndarray, weights: np.ndarray, steals: np.ndarray) -> ResourceBelief:
+    return ResourceBelief(hands, weights / weights.sum(), steals)
 
 
-def _merged(hands: np.ndarray, weights: np.ndarray) -> ResourceBelief:
+def _merged(hands: np.ndarray, weights: np.ndarray, steals: np.ndarray) -> ResourceBelief:
     flat = hands.reshape(len(hands), -1)
-    unique, inverse = np.unique(flat, axis=0, return_inverse=True)
+    unique, first, inverse = np.unique(flat, axis=0, return_index=True, return_inverse=True)
     summed = np.bincount(inverse.reshape(-1), weights=weights, minlength=len(unique))
-    return _normalized(unique.reshape(-1, NUM_SEATS, NUM_RESOURCES), summed)
+    shaped = unique.reshape(-1, NUM_SEATS, NUM_RESOURCES)
+    return _normalized(shaped, summed, steals[first])

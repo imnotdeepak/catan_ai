@@ -132,7 +132,7 @@ def test_cards_held_unplayed_are_more_likely_vp_cards() -> None:
 
 def test_resampling_is_unbiased_and_bounded() -> None:
     weights = np.array([0.5, 0.3, 0.2])
-    belief = ResourceBelief(np.zeros((3, 4, 5), dtype=np.int16), weights)
+    belief = ResourceBelief(np.zeros((3, 4, 5), np.int16), weights, np.zeros((3, 0), np.int8))
     picked = resample(belief, 10, np.random.default_rng(0))
     assert picked.size <= 3 and picked.weights.sum() == pytest.approx(1)
     np.testing.assert_allclose(picked.weights, weights, atol=0.1)
