@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from catan_ai.beliefs.dev_cards import DECK_COUNTS, dev_belief
+from catan_ai.beliefs.evidence import NO_EVIDENCE, ChoiceEvidence
 from catan_ai.beliefs.particles import ENUMERATED, EXACT, PARTICLES, BeliefTracker, resample
 from catan_ai.beliefs.resources import (
     BeliefError,
@@ -181,3 +182,33 @@ def test_tracker_restarts_on_a_new_history() -> None:
     fresh = Referee.new_game(2)
     belief = tracker.update(fresh.observe(0))
     assert belief.exact and not belief.hands.any()
+
+
+def test_choice_evidence_reweights_without_eliminating() -> None:
+    """Strong miss rates change weights only: the hypothesis set, and so the truth, stays."""
+    strong = ChoiceEvidence(city=0.05, settlement=0.05, dev_card=0.2, maritime=0.2)
+    changed = 0
+    plain = [BeliefTracker(s, evidence=NO_EVIDENCE) for s in range(4)]
+    weighted = [BeliefTracker(s, evidence=strong) for s in range(4)]
+    for referee in play(SEEDS[0]):
+        real = truth(referee)
+        for seat in range(4):
+            obs = referee.observe(seat)
+            a, b = plain[seat].update(obs), weighted[seat].update(obs)
+            assert {h.tobytes() for h in a.hands} == {h.tobytes() for h in b.hands}
+            assert (b.hands == real[None]).all(axis=(1, 2)).any()
+            assert b.weights.sum() == pytest.approx(1.0)
+            changed += a.size > 1 and not np.allclose(np.sort(a.weights), np.sort(b.weights))
+    assert changed > 0
+
+
+def test_choice_evidence_factors() -> None:
+    referee = next(r for r in play(SEEDS[0]) if not r.observe(0).is_initial_build_phase)
+    obs = referee.observe(0)
+    hands = np.array([[0, 0, 0, 2, 3], [1, 1, 1, 1, 0], [4, 0, 0, 0, 0], [0, 1, 0, 0, 0]])
+    factors = ChoiceEvidence(city=0.1, settlement=0.2, dev_card=1.0, maritime=0.5).factors(
+        hands, obs, 1
+    )
+    # After setup every seat has settlements to upgrade and pieces left.
+    assert factors.tolist() == pytest.approx([0.1, 0.2, 0.5, 1.0])
+    assert NO_EVIDENCE.factors(hands, obs, 1).tolist() == [1.0] * 4

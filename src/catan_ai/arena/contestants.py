@@ -16,7 +16,7 @@
 - `negotiator:<style>:<spec>`: one of the five negotiator baselines
   (`catan_ai.trading.negotiators.STYLES`), every non-trade decision by `<spec>`.
 - `trader:<mode>:<spec>`: the trading agent (`catan_ai.trading.agent`), mode
-  `rules` or `model`, every non-trade decision by `<spec>`.
+  `rules`, `model` or `learned`, every non-trade decision by `<spec>`.
 - `catanatron:<spec>`: a built-in bot by registry spec, e.g. `catanatron:F`,
   `catanatron:AB:2`, `catanatron:W`. These receive the full engine `Game` and
   are therefore privileged (rules matrix H-01); results label them so.
@@ -131,7 +131,7 @@ class Contestant:
             from catan_ai.trading.negotiators import STYLES
 
             return tuple(STYLES)
-        return ("rules", "model")
+        return ("rules", "model", "learned")
 
     @property
     def is_defend(self) -> bool:

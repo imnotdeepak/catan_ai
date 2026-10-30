@@ -57,11 +57,14 @@ def play_match(
     max_decisions: int = MAX_DECISIONS,
     observer: DecisionObserver | None = None,
     agent_sink: dict[int, Any] | None = None,
+    overrides: dict[int, Any] | None = None,
 ) -> tuple[MatchResult, Referee]:
     """Play one game. Our agents see only their observations; engine bots see the game.
 
     `observer` (e.g. a dataset recorder) is not counted in decision time.
     `agent_sink`, if given, receives our agents by seat (e.g. to read their logs).
+    `overrides` puts a ready-made agent in a seat instead of its contestant's
+    (e.g. a learner collecting rollouts); that seat's contestant only names it.
     """
     started = time.perf_counter()
     referee = Referee.new_game(
@@ -71,8 +74,9 @@ def play_match(
     agents = {
         seat: c.make_agent(f"{seed}:{seat}:{c.name}")
         for seat, c in enumerate(seating)
-        if not c.is_engine_bot
+        if not c.is_engine_bot and seat not in (overrides or {})
     }
+    agents.update(overrides or {})
     if agent_sink is not None:
         agent_sink.update(agents)
     decisions, seconds = [0] * 4, [0.0] * 4

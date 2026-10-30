@@ -140,6 +140,14 @@ def require(belief: ResourceBelief, seat: int, cards: np.ndarray) -> ResourceBel
     return _normalized(belief.hands[keep], belief.weights[keep], belief.steals[keep])
 
 
+def reweight(belief: ResourceBelief, factors: np.ndarray) -> ResourceBelief:
+    """Multiply each hypothesis by a likelihood (choice evidence, `beliefs.evidence`)."""
+    weights = belief.weights * factors
+    if not weights.sum() > 0:
+        return belief
+    return _normalized(belief.hands, weights, belief.steals)
+
+
 def apply_event(
     belief: ResourceBelief, event: VisibleEvent, pending: tuple[int, ...] | None = None
 ) -> ResourceBelief:

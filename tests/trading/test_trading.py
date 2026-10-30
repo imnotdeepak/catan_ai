@@ -14,6 +14,7 @@ from catan_ai.engine.actions import RESOURCES
 from catan_ai.observations import Referee
 from catan_ai.trading.negotiators import STYLES, NegotiatorAgent, judge
 from catan_ai.trading.proposals import bundles, candidate_offers, is_lawful
+from catan_ai.trading.response import FEATURES, ResponseModel
 from tests.observations.test_firewall import play
 from tests.rules.helpers import force_turn, set_hand
 
@@ -146,3 +147,32 @@ def test_negotiator_styles_and_contestants(tmp_path: Path) -> None:
     results = run_tournament(lineup, 1, 3, out_dir=tmp_path)
     assert all(r.error is None for r in results)
     assert NegotiatorAgent("cooperative", RandomAgent("x")).style.offers_per_turn == 2
+
+
+def test_response_model_recovers_known_weights(tmp_path: Path) -> None:
+    rng = np.random.default_rng(0)
+    n = 20_000
+    x = np.column_stack([np.ones(n), rng.normal(size=(n, len(FEATURES) - 1))])
+    truth = rng.normal(scale=0.8, size=len(FEATURES))
+    pay = rng.uniform(0.3, 1.0, size=n)
+    accepted = rng.random(n) < pay / (1 + np.exp(-(x @ truth)))
+    model = ResponseModel.fit(x, pay, accepted)
+    assert np.abs(model.weights - truth).max() < 0.15
+    model.save(tmp_path / "m.json")
+    assert np.allclose(ResponseModel.load(tmp_path / "m.json").weights, model.weights)
+    assert 0 < model.yes(x[0]) < 1
+
+
+def test_traders_log_features_with_their_responses() -> None:
+    lineup = ["trader:rules:heuristic", "negotiator:cooperative:heuristic",
+              "catanatron:F", "negotiator:trade-resistant:heuristic"]  # fmt: skip
+    agents: dict[int, object] = {}
+    result, _ = play_match("log", 31, [Contestant(n) for n in lineup], agent_sink=agents)
+    assert result.error is None
+    trader = agents[0]
+    samples = trader.samples  # type: ignore[attr-defined]
+    assert len(samples) == len(trader.calibration) > 0  # type: ignore[attr-defined]
+    for seat, x, pay, _ in samples:
+        assert seat != 0 and x.shape == (len(FEATURES),) and 0 <= pay <= 1
+    # The bot never accepts.
+    assert not any(accepted for seat, _, _, accepted in samples if seat == 2)

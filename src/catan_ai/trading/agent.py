@@ -10,9 +10,10 @@ set of acceptors, under independent responses:
   a trade after which r could win at once is never made;
 - P(r accepts) = P(r can pay) * P(r says yes | can pay). P(can pay) comes from
   the resource belief; P(yes) from either a fixed rule (`mode="rules"`: a
-  logistic in r's estimated saving) or the opponent model (`mode="model"`:
+  logistic in r's estimated saving), the opponent model (`mode="model"`:
   each policy in the mixture asked in sampled worlds where the offer is on
-  the table, weighted by the posterior over r's policy);
+  the table, weighted by the posterior over r's policy), or the learned
+  response predictor (`mode="learned"`, `catan_ai.trading.response`);
 - the agent then confirms the best acceptor, so the offer is worth
   sum_i P(best acceptor is i) * max(value_i, 0).
 
@@ -22,10 +23,12 @@ trade; at most MAX_OFFERS_PER_TURN offers a turn, never the same one twice
 value is positive and otherwise rejects, attaching its best counteroffer.
 
 Predicted acceptance probabilities are logged with the observed responses
-for calibration (`calibration`).
+for calibration (`calibration`), and the response features with P(can pay)
+and the response as training data for the learned predictor (`samples`).
 """
 
 import math
+from pathlib import Path
 from typing import Final, Literal
 
 import numpy as np
@@ -37,6 +40,7 @@ from catan_ai.engine.actions import offer_trade
 from catan_ai.observations import PlayerObservation
 from catan_ai.opening.board import BoardAnalysis, analyze
 from catan_ai.opponents.model import OpponentModel
+from catan_ai.provenance import REPO_ROOT
 from catan_ai.trading.negotiators import (
     MAX_OFFERS_PER_TURN,
     can_offer,
@@ -45,7 +49,8 @@ from catan_ai.trading.negotiators import (
     offers_this_turn,
 )
 from catan_ai.trading.proposals import Vector, candidate_offers, is_lawful, maritime_benefits
-from catan_ai.victory.threats import threats, urgency
+from catan_ai.trading.response import DEFAULT_PATH, ResponseModel, features
+from catan_ai.victory.threats import first_winner, threats, urgency
 
 OFFER_MIN: Final = 0.15  # rounds of expected value an offer must bring
 ACCEPT_MIN: Final = 0.05
@@ -54,7 +59,17 @@ RULE_OFFSET: Final = 0.25
 ACCEPTANCE_WORLDS: Final = 1
 MODEL_SHORTLIST: Final = 2  # offers whose acceptance the opponent model scores (rules rank them)
 
-Mode = Literal["rules", "model"]
+Mode = Literal["rules", "model", "learned"]
+Detail = tuple[float, np.ndarray, float]  # (P(accept), response features, P(can pay))
+
+_response_models: dict[Path, ResponseModel] = {}
+
+
+def response_model(path: Path = REPO_ROOT / DEFAULT_PATH) -> ResponseModel:
+    """Loaded once per process."""
+    if path not in _response_models:
+        _response_models[path] = ResponseModel.load(path)
+    return _response_models[path]
 
 
 def expected_value(values: dict[int, float], accepts: dict[int, float]) -> float:
@@ -67,6 +82,10 @@ def expected_value(values: dict[int, float], accepts: dict[int, float]) -> float
     return ev
 
 
+def _ev(values: dict[int, float], details: dict[int, Detail]) -> float:
+    return expected_value(values, {seat: d[0] for seat, d in details.items()})
+
+
 class TradingAgent:
     def __init__(self, inner: Agent, mode: Mode = "rules", seed: int = 0) -> None:
         self.inner = inner
@@ -74,9 +93,13 @@ class TradingAgent:
         self.seed = seed
         self._tracker: BeliefTracker | None = None
         self._model: OpponentModel | None = None
+        self._response = response_model() if mode == "learned" else None
         self.calibration: list[tuple[float, bool]] = []  # (P(accept), accepted) per responder
-        self._pending: list[tuple[int, dict[int, float]]] = []  # (offer event index, p by seat)
-        self._urgency: tuple[tuple[int, int], np.ndarray] | None = None  # per observation
+        # (responder, features, P(can pay), accepted) per response
+        self.samples: list[tuple[int, np.ndarray, float, bool]] = []
+        self._pending: list[tuple[int, dict[int, Detail]]] = []  # (offer event index, by seat)
+        # Per observation: urgency weights and whether the viewer leads the race.
+        self._urgency: tuple[tuple[int, int], np.ndarray, bool] | None = None
 
     # ----- Plumbing
 
@@ -114,9 +137,10 @@ class TradingAgent:
             if not ended:
                 still.append((index, predicted))
                 continue
-            for seat, p in predicted.items():
+            for seat, (p, x, pay) in predicted.items():
                 if seat in responses:
                     self.calibration.append((p, responses[seat]))
+                    self.samples.append((seat, x, pay, responses[seat]))
         self._pending = still
 
     # ----- Decisions
@@ -140,10 +164,7 @@ class TradingAgent:
         self, observation: PlayerObservation, gets: Vector, gives: Vector, analysis: BoardAnalysis
     ) -> dict[int, float]:
         """Value of making this trade with each other seat (rounds saved, threat-adjusted)."""
-        owner = (id(observation), len(observation.history))
-        if self._urgency is None or self._urgency[0] != owner:
-            self._urgency = (owner, urgency(threats(observation, analysis), observation.seat))
-        weights = self._urgency[1]
+        weights = self._race(observation, analysis)[0]
         expected = self._tracker.belief.expected() if self._tracker is not None else None
         values = {}
         for seat in range(4):
@@ -166,24 +187,48 @@ class TradingAgent:
         use_model: bool = False,
     ) -> dict[int, float]:
         """P(each other seat accepts our offer of `give` for `receive`)."""
+        details = self._acceptance(observation, give, receive, analysis, use_model)
+        return {seat: d[0] for seat, d in details.items()}
+
+    def _race(
+        self, observation: PlayerObservation, analysis: BoardAnalysis
+    ) -> tuple[np.ndarray, bool]:
+        """Urgency weights per seat, and whether the viewer leads the race to 10."""
+        owner = (id(observation), len(observation.history))
+        if self._urgency is None or self._urgency[0] != owner:
+            race = threats(observation, analysis)
+            leads = first_winner(race, worst=True) == observation.seat
+            self._urgency = (owner, urgency(race, observation.seat), leads)
+        return self._urgency[1], self._urgency[2]
+
+    def _acceptance(
+        self,
+        observation: PlayerObservation,
+        give: Vector,
+        receive: Vector,
+        analysis: BoardAnalysis,
+        use_model: bool,
+    ) -> dict[int, Detail]:
         assert self._tracker is not None
         belief = self._tracker.belief
-        probs = {}
+        details = {}
         expected = belief.expected()
+        leads = self._race(observation, analysis)[1]
         model_yes = self._model_yes(observation, give, receive) if use_model else {}
         for seat in range(4):
             if seat == observation.seat:
                 continue
             pay = belief.prob_covers(seat, np.array(receive))
+            verdict = judge(observation, seat, receive, give, analysis, other_hand=expected[seat])
+            x = features(observation, seat, verdict, give, receive, leads)
             if seat in model_yes:
                 yes = model_yes[seat]
+            elif self._response is not None:
+                yes = self._response.yes(x)
             else:
-                theirs = judge(
-                    observation, seat, receive, give, analysis, other_hand=expected[seat]
-                )
-                yes = 1 / (1 + math.exp(-RULE_SLOPE * (theirs.theirs - RULE_OFFSET)))
-            probs[seat] = pay * yes
-        return probs
+                yes = 1 / (1 + math.exp(-RULE_SLOPE * (verdict.theirs - RULE_OFFSET)))
+            details[seat] = (pay * yes, x, pay)
+        return details
 
     def _model_yes(
         self, observation: PlayerObservation, give: Vector, receive: Vector
@@ -234,22 +279,22 @@ class TradingAgent:
             if (give, receive) in tried:
                 continue
             values = self._values(observation, receive, give, analysis)
-            accepts = self.acceptance(observation, give, receive, analysis, use_model=False)
-            scored.append((expected_value(values, accepts), give, receive, values, accepts))
+            details = self._acceptance(observation, give, receive, analysis, use_model=False)
+            scored.append((_ev(values, details), give, receive, values, details))
         scored.sort(key=lambda x: -x[0])
         if self.mode == "model":  # re-score the rules' shortlist with the opponent model
             for i, (_, give, receive, values, _) in enumerate(scored[:MODEL_SHORTLIST]):
-                accepts = self.acceptance(observation, give, receive, analysis, use_model=True)
-                scored[i] = (expected_value(values, accepts), give, receive, values, accepts)
+                details = self._acceptance(observation, give, receive, analysis, use_model=True)
+                scored[i] = (_ev(values, details), give, receive, values, details)
             scored.sort(key=lambda x: -x[0])
-        best = (scored[0][0], scored[0][1], scored[0][2], scored[0][4]) if scored else None
-        if best is None or best[0] < OFFER_MIN:
+        if not scored or scored[0][0] < OFFER_MIN:
             return None
+        value, give, receive, _, details = scored[0]
         bank = maritime_benefits(observation, analysis)
-        if bank and bank[0][1] >= best[0]:
+        if bank and bank[0][1] >= value:
             return None  # the bank or a port does at least as well, with certainty
-        self._pending.append((len(observation.history), best[3]))
-        return offer_trade(observation.seat, best[1], best[2])  # type: ignore[arg-type]
+        self._pending.append((len(observation.history), details))
+        return offer_trade(observation.seat, give, receive)  # type: ignore[arg-type]
 
     def respond(self, observation: PlayerObservation) -> CanonicalAction:
         trade = observation.pending_trade

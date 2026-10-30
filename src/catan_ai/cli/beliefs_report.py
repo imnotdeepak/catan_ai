@@ -23,6 +23,7 @@ import numpy as np
 
 from catan_ai.arena import replay
 from catan_ai.beliefs.dev_cards import DevBelief, dev_belief
+from catan_ai.beliefs.evidence import DEFAULT_EVIDENCE, NO_EVIDENCE
 from catan_ai.beliefs.particles import DEFAULT_BUDGET, BeliefTracker
 from catan_ai.engine import CanonicalAction
 from catan_ai.engine.actions import RESOURCES
@@ -39,9 +40,11 @@ HOARD_GRID = np.round(np.arange(0.0, 0.91, 0.05), 2)
 def track_game(job: tuple[dict[str, Any], int]) -> dict[str, Any]:
     record, budget = job
     trackers = [BeliefTracker(s, budget=budget) for s in range(4)]
+    plain = [BeliefTracker(s, budget=budget, evidence=NO_EVIDENCE) for s in range(4)]
     out: dict[str, list[Any]] = {
         "tier": [], "size": [], "seconds": [], "ruled_out": [], "resource": [], "vp": [],
-        "abs_error": [], "naive_error": [], "log_loss": [],
+        "abs_error": [], "naive_error": [], "log_loss": [], "resource_plain": [],
+        "abs_error_plain": [], "log_loss_plain": [],
     }  # fmt: skip
 
     def observe(seat: int, referee: Referee, action: CanonicalAction) -> None:
@@ -57,6 +60,19 @@ def track_game(job: tuple[dict[str, Any], int]) -> dict[str, Any]:
             out["ruled_out"].append(not (belief.hands == truth[None]).all(axis=(1, 2)).any())
             expected = belief.expected()
             devs = dev_belief(obs)
+            if DEFAULT_EVIDENCE.active:  # the ledger without choice evidence, for comparison
+                base = plain[viewer].update(obs)
+                base_expected = base.expected()
+                for other in range(4):
+                    if other == viewer:
+                        continue
+                    out["abs_error_plain"].append(np.abs(base_expected[other] - truth[other]).sum())
+                    for r in range(len(RESOURCES)):
+                        dist = base.marginal(other, r)
+                        held = truth[other, r]
+                        out["resource_plain"].append((1.0 - dist[0], held > 0))
+                        prob = dist[held] if held < len(dist) else 0.0
+                        out["log_loss_plain"].append(-np.log(max(prob, 1e-12)))
             for other in range(4):
                 if other == viewer:
                     continue
@@ -164,6 +180,15 @@ def main(argv: list[str] | None = None) -> int:
     seconds = np.array(merged["seconds"])
     ruled_out = int(np.sum(merged["ruled_out"]))
     resource = np.array(merged["resource"], dtype=np.float64)
+    resource_plain = np.array(merged["resource_plain"], dtype=np.float64).reshape(-1, 2)
+    e = DEFAULT_EVIDENCE
+    evidence_note = (
+        f"Choice evidence (`catan_ai.beliefs.evidence`): at an opponent's END_TURN, hypotheses "
+        f"under which it could have built a city, a settlement or a development card, or "
+        f"traded four of a kind with the bank, are weighted by miss rates {e.city:.2f}, "
+        f"{e.settlement:.2f}, {e.dev_card:.2f} and {e.maritime:.2f} (fitted on `dev` by "
+        f"`catan_ai.cli.evidence_fit`)."
+    )
     vp_held = np.array([c[3] for c in merged["vp"]], dtype=np.float64)
     vp_plain = np.column_stack([vp_probabilities(merged["vp"], 0.0), vp_held])
     vp_fitted = np.column_stack([vp_probabilities(merged["vp"], play_rate, hoard), vp_held])
@@ -206,6 +231,17 @@ def main(argv: list[str] | None = None) -> int:
         f"| Mean error per opponent hand, naive | {np.mean(merged['naive_error']):.3f} cards |",
         f"| Mean log loss of the true count, per opponent and resource | "
         f"{np.mean(merged['log_loss']):.4f} nats |",
+        *(
+            [
+                f"| Without choice evidence: error / log loss | "
+                f"{np.mean(merged['abs_error_plain']):.3f} cards / "
+                f"{np.mean(merged['log_loss_plain']):.4f} nats |",
+                "",
+                evidence_note,
+            ]
+            if len(resource_plain)
+            else []
+        ),
         "",
         "## Calibration",
         "",
@@ -216,6 +252,18 @@ def main(argv: list[str] | None = None) -> int:
         "|---|---|---|---|",
         *calibration_rows(resource, uncertain_only=True),
         "",
+        *(
+            [
+                "Without choice evidence:",
+                "",
+                "| Predicted | Cases | Mean predicted | Observed |",
+                "|---|---|---|---|",
+                *calibration_rows(resource_plain, uncertain_only=True),
+                "",
+            ]
+            if len(resource_plain)
+            else []
+        ),
         "P(an opponent with face-down development cards holds a VP card). Deck odds alone "
         "(hypergeometric, play rate 0):",
         "",

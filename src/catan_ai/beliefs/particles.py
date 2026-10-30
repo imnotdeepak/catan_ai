@@ -23,12 +23,14 @@ from typing import Final
 
 import numpy as np
 
+from catan_ai.beliefs.evidence import DEFAULT_EVIDENCE, ChoiceEvidence
 from catan_ai.beliefs.resources import (
     BeliefError,
     ResourceBelief,
     apply_event,
     check,
     initial_belief,
+    reweight,
 )
 from catan_ai.engine import ActionKind
 from catan_ai.observations import PlayerObservation
@@ -53,10 +55,17 @@ def resample(belief: ResourceBelief, budget: int, rng: np.random.Generator) -> R
 
 
 class BeliefTracker:
-    def __init__(self, seat: int, budget: int = DEFAULT_BUDGET, seed: int = 0) -> None:
+    def __init__(
+        self,
+        seat: int,
+        budget: int = DEFAULT_BUDGET,
+        seed: int = 0,
+        evidence: ChoiceEvidence = DEFAULT_EVIDENCE,
+    ) -> None:
         self.seat = seat
         self.budget = budget
         self.seed = seed
+        self.evidence = evidence
         self.recoveries = 0
         self.tier_counts: Counter[int] = Counter()
         self._reset(budget)
@@ -88,18 +97,30 @@ class BeliefTracker:
         if self._seen > len(history) or (self._seen and history[self._seen - 1] is not self._last):
             self._reset(self.budget)  # not the history this tracker has been following
         try:
-            self._advance(history)
+            self._advance(observation)
         except BeliefError:
             if not self._approximate:
                 raise
-            self._recover(history)
+            self._recover(observation)
         check(self._belief, observation)
         self.tier_counts[self.tier] += 1
         return self._belief
 
-    def _advance(self, history: tuple[VisibleEvent, ...]) -> None:
-        for event in history[self._seen :]:
+    def _advance(self, observation: PlayerObservation) -> None:
+        """Apply unseen events. Choice evidence at an opponent's END_TURN uses the current
+        observation's public counts, which lag by at most the events of one update."""
+        for event in observation.history[self._seen :]:
             self._belief = apply_event(self._belief, event, self._trade)
+            if (
+                event.event_type == ActionKind.END_TURN
+                and event.actor is not None
+                and event.actor != self.seat
+                and self.evidence.active
+                and not self._belief.exact
+            ):
+                hands = self._belief.hands[:, event.actor, :]
+                factors = self.evidence.factors(hands, observation, event.actor)
+                self._belief = reweight(self._belief, factors)
             if event.event_type == ActionKind.OFFER_TRADE:
                 self._trade = tuple(event.public["action"]["params"][1])
             elif event.event_type in TRADE_ENDS:
@@ -111,14 +132,14 @@ class BeliefTracker:
             self._seen += 1
             self._last = event
 
-    def _recover(self, history: tuple[VisibleEvent, ...]) -> None:
+    def _recover(self, observation: PlayerObservation) -> None:
         budget = self._active_budget
         while self.recoveries < MAX_RECOVERIES:
             self.recoveries += 1
             budget *= 4
             self._reset(budget)
             try:
-                self._advance(history)
+                self._advance(observation)
                 return
             except BeliefError:
                 continue
