@@ -68,6 +68,7 @@ Each comparison plays the candidate and the baseline against the same two oppone
 | 0.3 champion + rules trading | 0.3 champion | cooperative + self-interested negotiators | 1,200 | **90.5%** | 88.5% to 92.5% | better | `ablations/trader-rules.md` |
 | model trader | rules trader | opportunistic + risk-averse negotiators | 1,200 | **54.2%** | 51.5% to 57.0% | better (p = 0.012) | `ablations/trader-model-vs-rules.md` |
 | 0.3 champion + rules trading | 0.3 champion | `catanatron:F` × 2 | 800 | 50.0% | 48.3% to 51.7% | no difference | `ablations/trader-rules-vs-F.md` |
+| learned trader | model trader | opportunistic + risk-averse negotiators | 800 | 47.4% | 44.3% to 50.5% | no difference (p = 0.21) | `ablations/trader-learned-vs-model.md` |
 
 ### What the ablations show
 
@@ -79,6 +80,7 @@ Each comparison plays the candidate and the baseline against the same two oppone
   - This also explains the small 4-player reports, where the rules trader always sat just before the model trader and won more.
   - The ablation averages both orders, so its 54.2% is the fair comparison.
 - **Speed:** the model trader takes about 45 s of decision time per game, against 12 s for the rules trader.
+- **Learned vs model trader:** no significant difference (47.4% for the learned trader; 53.1% moving first, 41.7% moving second). The learned trader decides in 14 s per game against 57 s, so it is the cheaper choice where speed matters. It underpredicts acceptance by trading opponents (`reports/trade_response.md`), which may cost it the offers that would have worked.
 
 ### Caveats
 
