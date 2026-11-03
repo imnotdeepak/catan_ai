@@ -8,9 +8,16 @@ when it offers:
 
 - the trade's value to each side, by the planner (rounds saved);
 - whether the proposer leads the race to 10, and both sides' visible points;
-- the responder's record this game: how often it has accepted, and how many
-  offers it has answered. This is what separates a trade-resistant player
-  (or a bot that never trades) from a cooperative one after a few offers.
+- the responder's record this game: how often it has accepted, how many
+  offers it has answered, and whether it has accepted from this proposer.
+  This is what separates a trade-resistant player (or a bot that never
+  trades) from a cooperative one after a few offers;
+- whether the responder trades on its own initiative: offers it has made and
+  counteroffers it has attached. Players that never trade make neither, so
+  these separate styles before any offer has been answered;
+- thresholds on the responder's saving, since styles accept above different
+  margins (a small loss, any gain, a clear gain), and the saving's sign
+  crossed with the responder being a trader.
 """
 
 import json
@@ -31,6 +38,9 @@ FEATURES: Final = (
     "bias",
     "responder saving",
     "responder saving > 0",
+    "responder saving > -0.25",
+    "responder saving > 0.5",
+    "responder saving > 1",
     "proposer saving",
     "proposer leads",
     "proposer points",
@@ -40,22 +50,43 @@ FEATURES: Final = (
     "responder acceptance rate",
     "responder responses (log)",
     "responder accepted before",
+    "responder accepted from proposer",
+    "responder offers made (log)",
+    "responder counteroffers (log)",
+    "responder trades x saving > 0",
 )
 CLIP: Final = 5.0
 DEFAULT_PATH: Final = Path("champions") / "trade-response.json"
 
 
-def response_record(observation: PlayerObservation, seat: int) -> tuple[int, int]:
-    """(accepts, responses) by `seat` to offers so far this game."""
-    accepts = rejects = 0
+@dataclass(frozen=True)
+class Record:
+    """What `seat` has done in trades so far this game."""
+
+    accepts: int
+    responses: int
+    accepts_from_proposer: int
+    offers: int
+    counters: int
+
+
+def response_record(observation: PlayerObservation, seat: int, proposer: int) -> Record:
+    accepts = responses = from_proposer = offers = counters = 0
+    offerer = None
     for e in observation.history:
+        if e.event_type == ActionKind.OFFER_TRADE:
+            offerer = e.actor
+            offers += e.actor == seat
         if e.actor != seat:
             continue
         if e.event_type == ActionKind.ACCEPT_TRADE:
             accepts += 1
+            responses += 1
+            from_proposer += offerer == proposer
         elif e.event_type == ActionKind.REJECT_TRADE:
-            rejects += 1
-    return accepts, accepts + rejects
+            responses += 1
+            counters += bool(e.public.get("action", {}).get("params"))
+    return Record(accepts, responses, from_proposer, offers, counters)
 
 
 def features(
@@ -68,22 +99,30 @@ def features(
 ) -> np.ndarray:
     """Features of offering `give` for `receive` to `seat`; `verdict` is from the proposer's
     view (`mine` the proposer's saving, `theirs` the responder's)."""
-    accepts, responses = response_record(observation, seat)
+    r = response_record(observation, seat, observation.seat)
     players = observation.players
+    trader = r.accepts > 0 or r.offers > 0 or r.counters > 0
     return np.array(
         [
             1.0,
             float(np.clip(verdict.theirs, -CLIP, CLIP)),
             float(verdict.theirs > 0),
+            float(verdict.theirs > -0.25),
+            float(verdict.theirs > 0.5),
+            float(verdict.theirs > 1),
             float(np.clip(verdict.mine, -CLIP, CLIP)),
             float(proposer_leads),
             players[observation.seat].visible_victory_points / 10,
             players[seat].visible_victory_points / 10,
             sum(give) / 2,
             sum(receive) / 2,
-            (accepts + 1) / (responses + 2),
-            math.log1p(responses),
-            float(accepts > 0),
+            (r.accepts + 1) / (r.responses + 2),
+            math.log1p(r.responses),
+            float(r.accepts > 0),
+            float(r.accepts_from_proposer > 0),
+            math.log1p(r.offers),
+            math.log1p(r.counters),
+            float(trader and verdict.theirs > 0),
         ],
         dtype=np.float64,
     )

@@ -218,7 +218,7 @@ class TradingAgent:
         for seat in range(4):
             if seat == observation.seat:
                 continue
-            pay = belief.prob_covers(seat, np.array(receive))
+            pay = min(belief.prob_covers(seat, np.array(receive)), 1.0)  # float sum can exceed 1
             verdict = judge(observation, seat, receive, give, analysis, other_hand=expected[seat])
             x = features(observation, seat, verdict, give, receive, leads)
             if seat in model_yes:

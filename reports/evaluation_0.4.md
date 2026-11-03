@@ -36,9 +36,9 @@ Release 0.4, plan §6 to §8. Exit gate (plan §12): probability calibration, no
   - It splits weight between the value-function component and the champion network for `catanatron:F`, which is expected, since the network imitates F.
 - **Learned trade-response predictor** (`reports/trade_response.md`):
   - A logistic model on what the proposer can see, times P(can pay), fitted to 62,000 logged responses.
-  - On 26,000 held-out responses it scores Brier 0.053, against 0.135 for the rule (0.091 for the base rate).
+  - On 26,000 held-out responses it scores Brier 0.044, against 0.134 for the rule (0.093 for the base rate), after style features were added (offers and counteroffers the responder has made, acceptances from this proposer, saving thresholds). The first version, without them, scored 0.053.
   - Most of the gain comes from recognising players that never accept (`catanatron:F`, the plain champion).
-  - It is slightly worse than the rule on the cooperative negotiators, which it underpredicts early in a game.
+  - It is still slightly worse than the rule on the cooperative and self-interested negotiators, and it overpredicts the risk-averse one, which also refuses proposers that gain more than it does.
   - `trader:learned:<spec>` uses it.
 
 ## Trading (TRD-026 to TRD-028)
@@ -69,6 +69,7 @@ Each comparison plays the candidate and the baseline against the same two oppone
 | model trader | rules trader | opportunistic + risk-averse negotiators | 1,200 | **54.2%** | 51.5% to 57.0% | better (p = 0.012) | `ablations/trader-model-vs-rules.md` |
 | 0.3 champion + rules trading | 0.3 champion | `catanatron:F` × 2 | 800 | 50.0% | 48.3% to 51.7% | no difference | `ablations/trader-rules-vs-F.md` |
 | learned trader | model trader | opportunistic + risk-averse negotiators | 800 | 47.4% | 44.3% to 50.5% | no difference (p = 0.21) | `ablations/trader-learned-vs-model.md` |
+| learned trader (style features) | rules trader | opportunistic + risk-averse negotiators | 800 | 48.2% | 44.9% to 51.5% | no difference (p = 0.40) | `ablations/trader-learned-vs-rules.md` |
 
 ### What the ablations show
 
@@ -81,6 +82,7 @@ Each comparison plays the candidate and the baseline against the same two oppone
   - The ablation averages both orders, so its 54.2% is the fair comparison.
 - **Speed:** the model trader takes about 45 s of decision time per game, against 12 s for the rules trader.
 - **Learned vs model trader:** no significant difference (47.4% for the learned trader; 53.1% moving first, 41.7% moving second). The learned trader decides in 14 s per game against 57 s, so it is the cheaper choice where speed matters. It underpredicts acceptance by trading opponents (`reports/trade_response.md`), which may cost it the offers that would have worked.
+- **Accuracy is not the bottleneck.** The learned trader, three times more accurate than the rule, ties the rules trader (48.2%). Only the opponent-model trader beats it (54.2%), so plan §8.5's "learned trading beats heuristic trading" holds for the opponent-model trader, not for the learned-response predictor. Trading strength is more likely limited by the candidate offers and the planner's valuation of a trade, which every trader shares.
 
 ### Caveats
 
