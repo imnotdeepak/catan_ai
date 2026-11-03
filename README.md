@@ -1,6 +1,6 @@
-# catan_ai
+# Robber
 
-Research AI for **standard four-player base Catan**, built on a pinned [Catanatron](https://github.com/bcollazo/catanatron) engine. The agent may only use information a real player could legally know.
+**Robber** (repository and package `catan_ai`) is a research AI for **standard four-player base Catan**, built on a pinned [Catanatron](https://github.com/bcollazo/catanatron) engine. The agent may only use information a real player could legally know.
 
 The design, release plan and backlog live in [CATAN_AI_MASTER_PLAN.md](CATAN_AI_MASTER_PLAN.md). Decisions are logged in [docs/architecture-decisions.md](docs/architecture-decisions.md).
 

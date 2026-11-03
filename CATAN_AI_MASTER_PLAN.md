@@ -1,6 +1,6 @@
 # CATAN AI — MASTER IMPLEMENTATION PLAN
 
-**Project:** Superhuman Catan AI (research and engineering)  
+**Project:** Robber, a superhuman Catan AI (research and engineering; package `catan_ai`)  
 **Document version:** 1.1 — consolidated architecture 3.1  
 **Prepared:** 2026-10-28 · **Revised:** 2026-10-28  
 **Status:** Approved design / implementation not yet started  
