@@ -4,7 +4,7 @@ Release 0.4, plan §6 to §8. Exit gate (plan §12): probability calibration, no
 
 | Exit criterion | Result | Evidence |
 |---|---|---|
-| Probability calibration | **Met**, with a small known bias | Resource beliefs ECE 0.049; development-card beliefs ECE 0.034; trade acceptance Brier 0.062 (model) and 0.078 (rules) |
+| Probability calibration | **Met**, with a small known bias | Resource beliefs ECE 0.039 with choice evidence (0.049 without); development-card beliefs ECE 0.034; trade acceptance Brier 0.053 held out for the learned predictor (rule 0.135) |
 | No impossible hypotheses or particles | **Met** | 950,484 belief updates over 740 holdout games: the true hands were never ruled out; tier 3 used 0.00% of the time; 0 collapse recoveries |
 | No invalid transfers | **Met** | 3,400 trading games across the reports and ablations below, 0 errors, 0 truncations; card conservation asserted in `tests/trading` |
 | Game-level gain over 0.3 | **Met** at tables that trade; neutral against the trade-blind ladder | Trading champion takes 90.5% of the pair's wins against the 0.3 champion with negotiating opponents; 50.0% with two `catanatron:F` |
@@ -18,7 +18,7 @@ Release 0.4, plan §6 to §8. Exit gate (plan §12): probability calibration, no
   - The particle fallback is built and tested but was never needed. An update takes 0.07 ms on average.
 - **Accuracy:** the expected opponent hand is off by 0.57 cards on average, against 4.44 cards for spreading the card count evenly.
 - **Calibration:**
-  - *Resources (ECE 0.049).* Uncertain resource probabilities are slightly underconfident in every band: opponents hold the resource 3 to 9 points more often than predicted. The likely cause is that hypotheses are weighted only by the random steal, not by what the player then chose to do (a player that does not build a city probably cannot). Weighting hypotheses by the opponent model's action likelihoods (plan §6.2) is the planned fix.
+  - *Resources (ECE 0.049).* Uncertain resource probabilities are slightly underconfident in every band: opponents hold the resource 3 to 9 points more often than predicted. The likely cause is that hypotheses are weighted only by the random steal, not by what the player then chose to do (a player that does not build a city probably cannot). Choice evidence (plan §6.2, `catan_ai.beliefs.evidence`) addresses this: when an opponent ends its turn, hypotheses under which it could have built a city or settlement, or traded four of a kind with the bank, are down-weighted by miss rates fitted on `dev`. On `holdout` this cuts the hand error from 0.569 to 0.499 cards, the log loss from 0.180 to 0.157 and the ECE from 0.049 to 0.039, without ever ruling out the true hands. The remaining bias is in the same direction, and smaller.
   - *Development cards (ECE 0.034).* The deck odds alone are badly calibrated for VP cards (ECE 0.38), because unplayed cards are disproportionately VP cards. A hold-time likelihood fixes this. It has a play rate of 0.90 per playable card-turn and a hoarded share of 0.10, fitted on `dev` and evaluated on `holdout`.
 
 ## Opponent model (OPP-025)
@@ -34,7 +34,12 @@ Release 0.4, plan §6 to §8. Exit gate (plan §12): probability calibration, no
 - **Identification:**
   - The mixture identifies random-like policies well.
   - It splits weight between the value-function component and the champion network for `catanatron:F`, which is expected, since the network imitates F.
-- **Still open in OPP-025:** a trade-response predictor learned from data. The model trader simulates responders in sampled worlds instead.
+- **Learned trade-response predictor** (`reports/trade_response.md`):
+  - A logistic model on what the proposer can see, times P(can pay), fitted to 62,000 logged responses.
+  - On 26,000 held-out responses it scores Brier 0.053, against 0.135 for the rule (0.091 for the base rate).
+  - Most of the gain comes from recognising players that never accept (`catanatron:F`, the plain champion).
+  - It is slightly worse than the rule on the cooperative negotiators, which it underpredicts early in a game.
+  - `trader:learned:<spec>` uses it.
 
 ## Trading (TRD-026 to TRD-028)
 

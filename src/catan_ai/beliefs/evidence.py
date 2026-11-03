@@ -8,8 +8,8 @@ them. So when an opponent ends its turn, every hypothesis under which it could
 have made such a move is multiplied by that move's miss rate: how often a
 player who could, did not.
 
-The miss rates are fitted on the `dev` split by `catan_ai.cli.beliefs_report
---fit-evidence` and shared by every viewer. Legality is approximated from
+The miss rates are fitted on the `dev` split by `catan_ai.cli.evidence_fit`
+and shared by every viewer. Legality is approximated from
 public counts (pieces left, a settlement to upgrade, cards left in the deck),
 not from the board, so the fitted rates absorb the cases where a site was not
 reachable. A rate of 1 is no evidence, so `NO_EVIDENCE` reproduces the plain
@@ -60,5 +60,6 @@ class ChoiceEvidence:
 
 
 NO_EVIDENCE: Final = ChoiceEvidence()
-# Fitted on `dev` by `beliefs_report --fit-evidence` (reports/beliefs.md).
-DEFAULT_EVIDENCE: Final = NO_EVIDENCE
+# Fitted on 300 `dev` games by `catan_ai.cli.evidence_fit` (lowest log loss of the true
+# count: 0.270 against 0.309 without evidence); evaluated on `holdout` in reports/beliefs.md.
+DEFAULT_EVIDENCE: Final = ChoiceEvidence(city=0.02, settlement=0.40, dev_card=1.0, maritime=0.70)

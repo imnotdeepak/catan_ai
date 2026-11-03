@@ -739,7 +739,7 @@ Each task should become a GitHub issue with an owner, acceptance tests and a rep
 - [x] **BEL-022:** Event-sourced exact resource/development-card ledger (Tier 1).
 - [x] **BEL-023:** Enumerated joint hypotheses for ambiguous events, with conservation assertions (Tier 2).
 - [x] **BEL-024:** Particle fallback, collapse detection/recovery and calibration harness (Tier 3). Build only if tier-usage data from BEL-023 shows enumeration exceeds budget.
-- [ ] **OPP-025:** Opponent interface (§7.2) and policy-mixture baseline; then learned next-action and trade-response predictors. Interface, mixture and simulated trade responses done (`reports/opponents.md`); learned trade-response predictor open.
+- [x] **OPP-025:** Opponent interface (§7.2) and policy-mixture baseline; then learned next-action and trade-response predictors. Mixture (`reports/opponents.md`); learned trade-response predictor (`reports/trade_response.md`).
 - [x] **TRD-026:** Candidate proposal generator and bank/port fallback.
 - [x] **TRD-027:** Domestic trade state machine, rule-lawful counteroffers and loop guards, scoped by ENG-010.
 - [x] **TRD-028:** Joint response/counterfactual trade evaluation, immediate-win threat tests.
