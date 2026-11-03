@@ -1,0 +1,40 @@
+{
+  "description": "Release 0.5 check (ML-029): PPO ppo-1 round-30 snapshot on the Release 0.2/0.3 ladder tiers, same board seeds as reports/evaluation_0.3.md.",
+  "model": "champions/robber-ppo1-r30.pt",
+  "tiers": [
+    {
+      "name": "weak",
+      "lineup": [
+        "model:champions/robber-ppo1-r30.pt",
+        "catanatron:W",
+        "catanatron:VP",
+        "catanatron:R"
+      ],
+      "boards": 100,
+      "seed": 400000
+    },
+    {
+      "name": "value-function",
+      "lineup": [
+        "model:champions/robber-ppo1-r30.pt",
+        "catanatron:F",
+        "catanatron:W",
+        "catanatron:VP"
+      ],
+      "boards": 100,
+      "seed": 410000
+    },
+    {
+      "name": "strong",
+      "lineup": [
+        "model:champions/robber-ppo1-r30.pt",
+        "catanatron:AB:2",
+        "catanatron:F",
+        "catanatron:W"
+      ],
+      "boards": 50,
+      "seed": 420000
+    }
+  ],
+  "title": "Release 0.5 Evaluation: PPO champion (ppo-1, round 30)"
+}
