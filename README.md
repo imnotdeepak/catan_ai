@@ -4,14 +4,11 @@
 
 The design, release plan and backlog live in [CATAN_AI_MASTER_PLAN.md](CATAN_AI_MASTER_PLAN.md). Decisions are logged in [docs/architecture-decisions.md](docs/architecture-decisions.md).
 
-**Status:** Release 0.3 (openings and victory) is complete. The champion is `champions/imitation-features-v3.pt`: the imitation network given board-analysis and opening-prior features. It beats the 0.2 champion in 63.1% of their head-to-head decided games (two training seeds, `reports/openings.md`). On the 0.2 ladder it wins 91.5% against the weak bots (0.2: 86.8%), 35.5% head to head with ValueFunction (0.2: 23.2%) and 16.5% in the strong tier (0.2: 14.0%) (`reports/evaluation_0.3.md`). Release 0.3 also added exact victory accounting, a route-to-10 planner and a turn-order threat model with defensive robber play (`reports/victory.md`); neither the planner's outputs as features nor the defense measurably improved play.
+**Status:** Release 0.5 (league reinforcement learning) is complete. The champion is `champions/robber-ppo2-r60.pt`: the imitation network improved by two masked PPO runs against a league of built-in bots, the imitation champion and its own snapshots. Each run's champion beat the previous one head to head (63.7%, then 61.6% of the pair's wins). On the ladder it ranks first in every tier: 96.0% against the weak bots, 56.5% with ValueFunction (which wins 43.2%) and 36.5% in the strong tier (AlphaBeta 34.0%, ValueFunction 28.5%), seeing only what a player could legally know (`reports/release_0.5.md`).
 
-Release 0.4 (beliefs, trade and opponents) has met its exit gate (`reports/evaluation_0.4.md`):
+Release 0.4 added beliefs (opponent hands tracked from the public record, never ruling out the true hands), a Bayesian opponent model and trading with no invalid transfers. With trading, the champion takes 90.5% of the head-to-head wins against the plain 0.3 champion at a table where others trade (`reports/evaluation_0.4.md`).
 
-- **Beliefs:** opponent hands are tracked from the public record, never ruling out the true hands (ECE 0.049 for resources, 0.034 for development cards).
-- **Opponent model:** a Bayesian policy mixture predicts opponents' next actions.
-- **Trading:** the trading agents complete thousands of games with no invalid transfer.
-- **Results:** at a table where others trade, the trading champion takes 90.5% of the head-to-head wins against the 0.3 champion. Against the trade-blind ladder it ties (50.0%). The trader that simulates responses with the opponent model beats the rule-based trader (54.2%).
+Earlier: Release 0.3 (openings and victory) is complete. The champion is `champions/imitation-features-v3.pt`: the imitation network given board-analysis and opening-prior features. It beats the 0.2 champion in 63.1% of their head-to-head decided games (two training seeds, `reports/openings.md`). On the 0.2 ladder it wins 91.5% against the weak bots (0.2: 86.8%), 35.5% head to head with ValueFunction (0.2: 23.2%) and 16.5% in the strong tier (0.2: 14.0%) (`reports/evaluation_0.3.md`). Release 0.3 also added exact victory accounting, a route-to-10 planner and a turn-order threat model with defensive robber play (`reports/victory.md`); neither the planner's outputs as features nor the defense measurably improved play.
 
 ## Setup
 

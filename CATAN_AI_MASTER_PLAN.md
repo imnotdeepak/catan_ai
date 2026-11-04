@@ -746,7 +746,7 @@ Each task should become a GitHub issue with an owner, acceptance tests and a rep
 
 ### P4 — Releases 0.5–1.0: league, search and evaluation
 
-- [ ] **ML-029:** Masked PPO worker/learner, checkpoint league, champion promotion.
+- [x] **ML-029:** Masked PPO worker/learner, checkpoint league, champion promotion (`reports/release_0.5.md`).
 - [ ] **SRCH-030:** Observation-consistent root sampling and independent search branches.
 - [ ] **SRCH-031:** Adaptive search budgets, search-vs-no-search ablations and distillation.
 - [ ] **EVAL-032:** Held-out tournaments, statistical reports, human-expert protocol and replay UI.
