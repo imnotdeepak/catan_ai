@@ -1,0 +1,22 @@
+{
+  "description": "Full league for ppo-3 (plan 9.3): the current champion, ValueFunction, the five trading negotiators and six opening archetypes (all on the current champion), the imitation champion, weak bots, and learner snapshots.",
+  "fixed": {
+    "model:champions/robber-ppo2-r60.pt": 0.15,
+    "catanatron:F": 0.20,
+    "negotiator:cooperative:model:champions/robber-ppo2-r60.pt": 0.05,
+    "negotiator:self-interested:model:champions/robber-ppo2-r60.pt": 0.05,
+    "negotiator:risk-averse:model:champions/robber-ppo2-r60.pt": 0.05,
+    "negotiator:opportunistic:model:champions/robber-ppo2-r60.pt": 0.05,
+    "negotiator:trade-resistant:model:champions/robber-ppo2-r60.pt": 0.05,
+    "opening:ows:model:champions/robber-ppo2-r60.pt": 0.025,
+    "opening:road:model:champions/robber-ppo2-r60.pt": 0.025,
+    "opening:port:model:champions/robber-ppo2-r60.pt": 0.025,
+    "opening:balanced:model:champions/robber-ppo2-r60.pt": 0.025,
+    "opening:cartel:model:champions/robber-ppo2-r60.pt": 0.025,
+    "opening:hybrid:model:champions/robber-ppo2-r60.pt": 0.025,
+    "model:champions/imitation-features-v3.pt": 0.05,
+    "catanatron:W": 0.025,
+    "catanatron:VP": 0.025
+  },
+  "snapshot_weight": 0.15
+}

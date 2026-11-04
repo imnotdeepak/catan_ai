@@ -91,3 +91,17 @@ def test_rollout_and_update_run_end_to_end() -> None:
     # First minibatch: the policy is the one that acted, so nothing is clipped yet.
     assert stats["clipped"] < 0.5
     assert any(not torch.equal(a, b) for a, b in zip(before, net.parameters(), strict=True))
+
+
+def test_learner_trades_inside_the_wrapper() -> None:
+    partners = ("negotiator:cooperative:heuristic", "negotiator:opportunistic:heuristic")
+    job = Job(
+        13,
+        (LEARNER, *partners, "random"),
+        str(CHAMPION),
+        0,
+        "trader:rules",
+    )
+    game = rollout(job)
+    assert game["error"] is None
+    assert game["trajectories"][0].chosen  # the policy still made its own choices

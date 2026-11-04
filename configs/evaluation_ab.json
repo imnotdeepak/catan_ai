@@ -1,0 +1,18 @@
+{
+  "title": "Robber vs AlphaBeta: large strong-tier evaluation (EVAL-032 prep)",
+  "description": "The strong tier with 250 boards on fresh seeds (440000+), to settle Robber against AlphaBeta.",
+  "model": "champions/robber-ppo2-r60.pt",
+  "tiers": [
+    {
+      "name": "strong-large",
+      "lineup": [
+        "model:champions/robber-ppo2-r60.pt",
+        "catanatron:AB:2",
+        "catanatron:F",
+        "catanatron:W"
+      ],
+      "boards": 250,
+      "seed": 440000
+    }
+  ]
+}

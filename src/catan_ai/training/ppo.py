@@ -2,8 +2,11 @@
 
 Rollouts: worker processes play full four-player games. The learner holds
 one or two random seats and samples from its masked policy over the legal
-candidates; the other seats are drawn from a league of opponents (the frozen
-champion, built-in bots, and snapshots of the learner taken during training).
+candidates; the other seats are drawn from a league of opponents (frozen
+champions, built-in bots, negotiators, opening archetypes, and snapshots of
+the learner taken during training). The learner can play inside a wrapper
+(e.g. `trader:learned`): the wrapper makes its trade decisions, and only the
+policy's own choices are trained.
 Each learner decision with a real choice is recorded with the player-view
 encoding, the chosen candidate, its log-probability and the value estimate.
 
@@ -115,6 +118,7 @@ class Job:
     seating: tuple[str, ...]  # LEARNER or a contestant spec, by seat
     weights: str  # learner checkpoint path
     version: int  # learner checkpoint version, so workers reload it
+    wrapper: str = ""  # e.g. "trader:learned": the learner plays inside this wrapper
 
 
 def rollout(job: Job) -> dict[str, Any]:
@@ -123,7 +127,10 @@ def rollout(job: Job) -> dict[str, Any]:
         s: LearnerAgent(net, job.seed * 4 + s) for s, n in enumerate(job.seating) if n == LEARNER
     }
     seating = [Contestant("heuristic" if n == LEARNER else n) for n in job.seating]
-    result, _ = play_match(f"ppo-{job.seed}", job.seed, seating, overrides=dict(learners))
+    agents: dict[int, Any] = dict(learners)
+    if job.wrapper:
+        agents = {s: wrap(job.wrapper, a, job.seed * 4 + s) for s, a in learners.items()}
+    result, _ = play_match(f"ppo-{job.seed}", job.seed, seating, overrides=agents)
     trajectories = []
     for seat, agent in learners.items():
         t = agent.trajectory
@@ -138,6 +145,16 @@ def rollout(job: Job) -> dict[str, Any]:
         "trajectories": trajectories,
         "seconds": result.wall_seconds,
     }
+
+
+def wrap(wrapper: str, agent: LearnerAgent, seed: int) -> Any:
+    """The learner inside a trading wrapper, `trader:<mode>`."""
+    kind, _, option = wrapper.partition(":")
+    if kind != "trader":
+        raise ValueError(f"unknown learner wrapper {wrapper!r}")
+    from catan_ai.trading.agent import TradingAgent
+
+    return TradingAgent(agent, mode=option, seed=seed)  # type: ignore[arg-type]
 
 
 # ----- League

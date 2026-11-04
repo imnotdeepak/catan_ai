@@ -16,11 +16,13 @@ import random
 import time
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import torch
 
+from catan_ai.arena import Contestant
 from catan_ai.models.network import load_checkpoint, save_checkpoint
 from catan_ai.provenance import REPO_ROOT, provenance
 from catan_ai.training.ppo import (
@@ -35,6 +37,9 @@ from catan_ai.training.ppo import (
 )
 
 CHAMPION = "champions/imitation-features-v3.pt"
+# The default league (ppo-1, ppo-2). `--league` takes a JSON file instead:
+# {"fixed": {spec: weight, ...}, "snapshot_weight": w}. The first fixed spec is
+# the one reported as "vs champion".
 LEAGUE = {
     f"model:{CHAMPION}": 0.35,
     "catanatron:F": 0.35,
@@ -54,6 +59,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--snapshot-every", type=int, default=5)
     parser.add_argument("--seed", type=int, default=900000)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--league", type=Path, default=None, help="league JSON (default built in)")
+    parser.add_argument("--wrapper", default="", help="learner wrapper, e.g. trader:learned")
     for name, value in asdict(PPOConfig()).items():
         parser.add_argument(f"--{name.replace('_', '-')}", type=type(value), default=value)
     args = parser.parse_args(argv)
@@ -70,14 +77,21 @@ def main(argv: list[str] | None = None) -> int:
     net, metadata = load_checkpoint(out / "latest.pt" if args.resume else init)
     reference, _ = load_checkpoint(init)
     optimizer = torch.optim.Adam(net.parameters(), lr=config.lr)
-    league = League(dict(LEAGUE), SNAPSHOT_WEIGHT)
+    if args.league is not None:
+        spec = json.loads((REPO_ROOT / args.league).read_text(encoding="utf-8"))
+        league = League(dict(spec["fixed"]), float(spec["snapshot_weight"]))
+    else:
+        league = League(dict(LEAGUE), SNAPSHOT_WEIGHT)
+    for name in league.fixed:
+        Contestant(name)  # fail fast on a bad spec
+    first = next(iter(league.fixed))
     start = 0
     if args.resume:
         start = int(metadata["iteration"])
         league.snapshots = list(metadata["snapshots"])
     else:
         (out / "config.json").write_text(
-            json.dumps({**vars(args), "ppo": asdict(config), "league": LEAGUE,
+            json.dumps({**vars(args), "ppo": asdict(config), "league": league.fixed,
                         "provenance": provenance()}, indent=2, default=str) + "\n",
             encoding="utf-8",
         )  # fmt: skip
@@ -100,7 +114,11 @@ def main(argv: list[str] | None = None) -> int:
             save_checkpoint(weights, net, state)
             jobs = [
                 Job(
-                    args.seed + iteration * 10_000 + g, league.seating(rng), str(weights), iteration
+                    args.seed + iteration * 10_000 + g,
+                    league.seating(rng),
+                    str(weights),
+                    iteration,
+                    args.wrapper,
                 )
                 for g in range(args.games)
             ]
@@ -129,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
                 "kept": len(decided),
                 "samples": len(buffer),
                 "learner_win": learner_wins / max(seats, 1),
-                "vs_champion": share(f"model:{CHAMPION}"),
+                "vs_champion": share(first),
                 "vs_F": share("catanatron:F"),
                 "truncated": sum(g["truncated"] for g in games),
                 "errors": sum(g["error"] is not None for g in games),
