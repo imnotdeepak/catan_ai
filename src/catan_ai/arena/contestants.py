@@ -17,6 +17,9 @@
   (`catan_ai.trading.negotiators.STYLES`), every non-trade decision by `<spec>`.
 - `trader:<mode>:<spec>`: the trading agent (`catan_ai.trading.agent`), mode
   `rules`, `model` or `learned`, every non-trade decision by `<spec>`.
+- `search:<budget>:model:<checkpoint>`: greedy play from the checkpoint with
+  belief-world root search at key decisions (`catan_ai.search`). The budget is
+  `<worlds>` or `<worlds>t<turns>`, e.g. `search:8:model:...`, `search:16t2:model:...`.
 - `catanatron:<spec>`: a built-in bot by registry spec, e.g. `catanatron:F`,
   `catanatron:AB:2`, `catanatron:W`. These receive the full engine `Game` and
   are therefore privileged (rules matrix H-01); results label them so.
@@ -48,6 +51,7 @@ MODEL_PREFIX = "model:"
 # Wrappers that take over initial placement: "<prefix><rule>:<inner agent spec>".
 OPENING_PREFIXES = ("opening:", "draft:", "draft-settle:")
 DEFEND_PREFIX = "defend:"
+SEARCH_PREFIX = "search:"
 # Wrappers with an option: "<prefix><option>:<inner agent spec>".
 TRADE_PREFIXES = ("negotiator:", "trader:")
 AGENTS: dict[str, Callable[[str], Agent]] = {
@@ -74,6 +78,18 @@ def load_policy(checkpoint: str) -> PolicyValue:
     return LearnedPolicyValue(net)
 
 
+def search_config(budget: str) -> Any:
+    """`<worlds>` or `<worlds>t<turns>` as a SearchConfig."""
+    from catan_ai.search import SearchConfig
+
+    worlds, _, turns = budget.partition("t")
+    if not worlds.isdigit() or (turns and not turns.isdigit()) or int(worlds) < 1:
+        raise ValueError(f"Bad search budget {budget!r}; use e.g. 8 or 8t2")
+    if turns:
+        return SearchConfig(worlds=int(worlds), turns=int(turns))
+    return SearchConfig(worlds=int(worlds))
+
+
 @dataclass(frozen=True)
 class Contestant:
     name: str
@@ -90,6 +106,12 @@ class Contestant:
                 raise ValueError(f"Unknown option {option!r} for {self.name!r}; known: {options}")
             if Contestant(inner).is_engine_bot:
                 raise ValueError(f"{self.name!r}: engine bots act engine-side, cannot be wrapped")
+        elif self.is_search:
+            budget, inner = self.opening_parts
+            search_config(budget)  # fail fast on a malformed budget
+            if not inner.startswith(MODEL_PREFIX):
+                raise ValueError(f"{self.name!r}: search needs a model: policy to roll out")
+            Contestant(inner)
         elif self.is_defend:
             if Contestant(self.defend_inner).is_engine_bot:
                 raise ValueError(f"{self.name!r}: engine bots act engine-side, cannot be wrapped")
@@ -108,6 +130,7 @@ class Contestant:
                     f"{MODEL_PREFIX}<checkpoint>",
                     *(f"{p}<rule>:<agent>" for p in OPENING_PREFIXES),
                     f"{DEFEND_PREFIX}<agent>",
+                    f"{SEARCH_PREFIX}<budget>:{MODEL_PREFIX}<checkpoint>",
                     *(f"{p}<option>:<agent>" for p in TRADE_PREFIXES),
                     f"{ENGINE_PREFIX}<code>",
                 ]
@@ -132,6 +155,10 @@ class Contestant:
 
             return tuple(STYLES)
         return ("rules", "model", "learned")
+
+    @property
+    def is_search(self) -> bool:
+        return self.name.startswith(SEARCH_PREFIX)
 
     @property
     def is_defend(self) -> bool:
@@ -177,6 +204,12 @@ class Contestant:
             from catan_ai.trading.agent import TradingAgent
 
             return TradingAgent(agent, mode=option, seed=_seed_int(seed))  # type: ignore[arg-type]
+        if self.is_search:
+            from catan_ai.search import SearchAgent
+
+            budget, inner = self.opening_parts
+            policy = load_policy(inner.removeprefix(MODEL_PREFIX))
+            return SearchAgent(policy, search_config(budget), seed=seed)
         if self.is_defend:
             from catan_ai.victory.threats import DefendAgent
 
