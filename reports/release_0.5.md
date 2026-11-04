@@ -50,13 +50,13 @@ Each comparison: candidate and baseline with two `catanatron:F`, 100 boards from
 
 The same tiers and board seeds as the Release 0.3 evaluation (`reports/evaluation_0.3.md`). Win rate per seat; `catanatron:` bots read the full game state (privileged).
 
-| Tier | 0.3 imitation champion | `robber-ppo1-r30` | **`robber-ppo2-r60`** | Rank |
-|---|---|---|---|---|
-| weak (W, VP, R) | 91.5% | 95.0% | **96.0%** | 1st |
-| value-function (F, W, VP) | 35.5% | 40.5% | **56.5%** | 1st (F 43.2%) |
-| strong (AB:2, F, W) | 16.5% | 27.0% | **36.5%** | 1st (AB:2 34.0%, F 28.5%) |
+| Tier | 0.3 imitation champion | `robber-ppo1-r30` | `robber-ppo2-r60` | **`robber-ppo3-r60`** | Rank |
+|---|---|---|---|---|---|
+| weak (W, VP, R) | 91.5% | 95.0% | 96.0% | **97.8%** | 1st |
+| value-function (F, W, VP) | 35.5% | 40.5% | 56.5% | **56.8%** | 1st (F 43.0%) |
+| strong (AB:2, F, W) | 16.5% | 27.0% | 36.5% | **40.5%** | 1st (AB:2 35.5%, F 23.5%) |
 
-Reports: `evaluation_0.5.md` (`robber-ppo1-r30`) and `evaluation_0.5_ppo2.md` (`robber-ppo2-r60`). 0 errors and 0 truncations in all evaluation games.
+Reports: `evaluation_0.5.md` (`robber-ppo1-r30`), `evaluation_0.5_ppo2.md` (`robber-ppo2-r60`) and `evaluation_0.5_ppo3.md` (`robber-ppo3-r60`). 0 errors and 0 truncations in all evaluation games.
 
 ### ppo-3: the full league with trading
 
@@ -68,7 +68,7 @@ Reports: `evaluation_0.5.md` (`robber-ppo1-r30`) and `evaluation_0.5_ppo2.md` (`
 The learner played inside the learned trading wrapper. Rollouts took about 7 minutes per iteration, against 0.5 minutes without trading.
 
 - **Result:** a better trader, with no loss in plain play. Wrapped in the trading agent, its round-60 snapshot takes 55.7% of the pair's wins against the wrapped `robber-ppo2-r60`, with cooperative and self-interested negotiators. As a plain policy against two `catanatron:F`, it is level or slightly ahead (53.4%, not significant).
-- **Champion:** it becomes the champion as `champions/robber-ppo3-r60.pt`. `robber-ppo2-r60` remains the measured ladder champion until the new one is run on the ladder.
+- **Champion:** it becomes the champion as `champions/robber-ppo3-r60.pt`. On the ladder it is level or ahead of `robber-ppo2-r60` in every tier (weak 97.8%, value-function 56.8%, strong 40.5%); none of the gains is significant on its own.
 
 ## Robber vs AlphaBeta: 1,000 games
 
