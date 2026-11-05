@@ -174,3 +174,27 @@ def test_distillation_fine_tunes_the_policy_tower_only(data_dir: Path, tmp_path:
     for name in before:
         same = torch.equal(before[name], after[name])
         assert same == (is_outcome_parameter(name) or name.startswith("aux_hands")), name
+
+
+def test_value_recalibration_trains_the_outcome_tower_only(data_dir: Path, tmp_path: Path) -> None:
+    split = load_split(data_dir, "train")
+    start = PolicyValueNet(
+        NetConfig(split.feature_version, *dims(split.feature_version), hidden=32, layers=2)
+    )
+    save_checkpoint(tmp_path / "init.pt", start, {})
+    settings = {
+        "seed": 0,
+        "init": str(tmp_path / "init.pt"),
+        "epochs": 1,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.01,
+        "policy_weight": 0.0,
+        "value_weight": 1.0,
+        "aux_weight": 0.1,
+        "net": {},
+    }
+    net, _ = train(settings, split, load_split(data_dir, "dev"), tmp_path, {}, log=lambda _: None)
+    before, after = start.state_dict(), net.state_dict()
+    changed = {name for name in before if not torch.equal(before[name], after[name])}
+    assert changed and all(is_outcome_parameter(name) for name in changed)

@@ -1,0 +1,101 @@
+{
+  "description": "Release 0.6 value recalibration: retrain the outcome tower of the search champion (robber-ppo3-r60 policy + imitation-features-v3 outcome tower) on the positions its rollouts actually reach: greedy ppo-3 self-play and ppo-3 with two ValueFunction bots. Only the ppo-3 seats are recorded; the policy tower is frozen (policy_weight 0).",
+  "name": "value-ppo3",
+  "dataset": {
+    "teachers": [
+      "model:champions/robber-ppo3-r60.pt"
+    ],
+    "splits": {
+      "train": {
+        "groups": [
+          {
+            "lineup": [
+              "model:champions/robber-ppo3-r60.pt",
+              "model:champions/robber-ppo3-r60.pt",
+              "model:champions/robber-ppo3-r60.pt",
+              "model:champions/robber-ppo3-r60.pt"
+            ],
+            "boards": 2400,
+            "seed": 800000,
+            "keep": 0.15
+          },
+          {
+            "lineup": [
+              "model:champions/robber-ppo3-r60.pt",
+              "model:champions/robber-ppo3-r60.pt",
+              "catanatron:F",
+              "catanatron:F"
+            ],
+            "boards": 400,
+            "seed": 810000,
+            "keep": 0.15
+          }
+        ]
+      },
+      "dev": {
+        "groups": [
+          {
+            "lineup": [
+              "model:champions/robber-ppo3-r60.pt",
+              "model:champions/robber-ppo3-r60.pt",
+              "model:champions/robber-ppo3-r60.pt",
+              "model:champions/robber-ppo3-r60.pt"
+            ],
+            "boards": 200,
+            "seed": 820000,
+            "keep": 0.15
+          },
+          {
+            "lineup": [
+              "model:champions/robber-ppo3-r60.pt",
+              "model:champions/robber-ppo3-r60.pt",
+              "catanatron:F",
+              "catanatron:F"
+            ],
+            "boards": 40,
+            "seed": 830000,
+            "keep": 0.15
+          }
+        ]
+      },
+      "holdout": {
+        "groups": [
+          {
+            "lineup": [
+              "model:champions/robber-ppo3-r60.pt",
+              "model:champions/robber-ppo3-r60.pt",
+              "model:champions/robber-ppo3-r60.pt",
+              "model:champions/robber-ppo3-r60.pt"
+            ],
+            "boards": 200,
+            "seed": 840000,
+            "keep": 0.15
+          },
+          {
+            "lineup": [
+              "model:champions/robber-ppo3-r60.pt",
+              "model:champions/robber-ppo3-r60.pt",
+              "catanatron:F",
+              "catanatron:F"
+            ],
+            "boards": 40,
+            "seed": 850000,
+            "keep": 0.15
+          }
+        ]
+      }
+    }
+  },
+  "training": {
+    "seed": 0,
+    "init": "champions/robber-ppo3-r60-imitation-value.pt",
+    "epochs": 8,
+    "batch_size": 512,
+    "lr": 0.0003,
+    "weight_decay": 0.0001,
+    "policy_weight": 0.0,
+    "value_weight": 1.0,
+    "aux_weight": 0.1,
+    "net": {}
+  }
+}

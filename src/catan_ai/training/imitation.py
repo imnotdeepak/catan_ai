@@ -210,9 +210,10 @@ def train(
     weights = (
         np.array(config["search_weights"], np.float32) if config.get("search_weights") else None
     )
-    optimizer = torch.optim.AdamW(
-        net.parameters(), lr=config["lr"], weight_decay=config["weight_decay"]
-    )
+    policy_weight = float(config.get("policy_weight", 1.0))
+    # With the policy loss off, only the outcome tower trains (value recalibration, 0.6).
+    trained = [p for n, p in net.named_parameters() if policy_weight or is_outcome_parameter(n)]
+    optimizer = torch.optim.AdamW(trained, lr=config["lr"], weight_decay=config["weight_decay"])
     steps = config["epochs"] * math.ceil(len(train_split) / config["batch_size"])
     schedule = torch.optim.lr_scheduler.OneCycleLR(optimizer, config["lr"], total_steps=steps)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -228,7 +229,7 @@ def train(
         for b in batches(train_split, config["batch_size"], rng, weights):
             parts = losses(net(b["states"], b["actions"], b["mask"]), b)
             total = (
-                parts["policy"]
+                policy_weight * parts["policy"]
                 + config["value_weight"] * parts["value"]
                 + config["aux_weight"] * (parts["aux_hands"] + parts["aux_points"])
             )
