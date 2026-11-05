@@ -24,6 +24,17 @@ def pct(x: float) -> str:
     return f"{x:.1%}"
 
 
+def _shown(path: Path) -> str:
+    """Repo-relative when inside the repo."""
+    try:
+        return path.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+SEARCHED = ("not searched", "searched, kept the policy's choice", "searched, switched")
+
+
 def report(
     manifest: dict[str, Any],
     data_sha: str,
@@ -46,7 +57,7 @@ def report(
         f"catan_ai `{str(info['catan_ai_commit'])[:7]}`, "
         f"engine `{str(info['engine_commit'])[:7]}`. "
         f"Dataset manifest sha256 `{data_sha[:12]}`, features v{manifest['feature_version']}. "
-        f"Checkpoint `{checkpoint.relative_to(REPO_ROOT).as_posix()}`: policy tower from epoch "
+        f"Checkpoint `{_shown(checkpoint)}`: policy tower from epoch "
         f"{epochs['policy_epoch']}, value tower from epoch {epochs['value_epoch']} (each at "
         f"its lowest dev loss); {minutes:.1f} min on CPU.",
         "",
@@ -121,6 +132,18 @@ def report(
         ),
         "",
     ]
+    if holdout.get("top1_by_searched"):
+        lines += [
+            "Top-1 by what the search teacher did (SRCH-031):",
+            "",
+            "| Decision | Top-1 | Samples |",
+            "|---|---|---|",
+            *(
+                f"| {SEARCHED[int(k)]} | {pct(a)} | {n:,} |"
+                for k, (a, n) in holdout["top1_by_searched"].items()
+            ),
+            "",
+        ]
     return "\n".join(lines)
 
 

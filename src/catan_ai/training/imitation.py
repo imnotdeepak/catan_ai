@@ -6,6 +6,12 @@ Losses, all on player-view inputs:
 - auxiliary: opponents' hidden hands and final victory points (privileged
   labels, used only as targets), weighted by `aux_weight`.
 
+Distillation (SRCH-031, plan §9.2 phase F) is the same training started from
+a checkpoint (`init`) on data whose teacher is a search agent, with the policy
+loss of each sample weighted by `search_weights[searched]` (unsearched,
+searched and kept, searched and switched), so the decisions search changed
+count for more.
+
 The saved checkpoint combines the policy tower from the epoch with the lowest
 dev policy loss and the outcome tower from the epoch with the lowest dev value
 loss (the towers share no weights; see models/network.py). Metrics are
@@ -30,15 +36,18 @@ from catan_ai.models.network import (
     NetConfig,
     PolicyValueNet,
     is_outcome_parameter,
+    load_checkpoint,
     save_checkpoint,
 )
+from catan_ai.provenance import REPO_ROOT
 from catan_ai.training.dataset import Split
 
 Batch = dict[str, torch.Tensor]
 
 
-def batch(split: Split, index: np.ndarray) -> Batch:
-    """Gather samples, padding candidate sets to the largest in the batch."""
+def batch(split: Split, index: np.ndarray, weights: np.ndarray | None = None) -> Batch:
+    """Gather samples, padding candidate sets to the largest in the batch. `weights`
+    are per-sample policy-loss weights by `searched` code (default all 1)."""
     start = split.offsets[index]
     counts = split.offsets[index + 1] - start
     width = int(counts.max())
@@ -47,7 +56,11 @@ def batch(split: Split, index: np.ndarray) -> Batch:
     rows = np.where(mask, start[:, None] + slots[None, :], 0)
     actions = split.actions[rows].astype(np.float32)
     actions[~mask] = 0.0
+    weight = np.ones(len(index), np.float32)
+    if weights is not None and split.searched is not None:
+        weight = weights[split.searched[index]].astype(np.float32)
     return {
+        "weight": torch.from_numpy(weight),
         "states": torch.from_numpy(split.states[index].astype(np.float32)),
         "actions": torch.from_numpy(actions),
         "mask": torch.from_numpy(mask),
@@ -58,21 +71,28 @@ def batch(split: Split, index: np.ndarray) -> Batch:
     }
 
 
-def batches(split: Split, size: int, rng: np.random.Generator | None = None) -> Iterator[Batch]:
+def batches(
+    split: Split,
+    size: int,
+    rng: np.random.Generator | None = None,
+    weights: np.ndarray | None = None,
+) -> Iterator[Batch]:
     order = rng.permutation(len(split)) if rng is not None else np.arange(len(split))
     for at in range(0, len(order), size):
-        yield batch(split, order[at : at + size])
+        yield batch(split, order[at : at + size], weights)
 
 
 def losses(out: dict[str, torch.Tensor], b: Batch) -> dict[str, torch.Tensor]:
     decided = b["winner"] >= 0
+    w = b["weight"]
     value = (
         F.cross_entropy(out["value_logits"][decided], b["winner"][decided])
         if decided.any()
         else out["value_logits"].sum() * 0
     )
     return {
-        "policy": F.cross_entropy(out["policy_logits"], b["label"]),
+        "policy": (F.cross_entropy(out["policy_logits"], b["label"], reduction="none") * w).sum()
+        / w.sum(),
         "value": value,
         "aux_hands": F.mse_loss(out["aux_hands"], b["opponent_hands"] / 4),
         "aux_points": F.mse_loss(out["aux_points"], b["final_points"] / 10),
@@ -80,7 +100,12 @@ def losses(out: dict[str, torch.Tensor], b: Batch) -> dict[str, torch.Tensor]:
 
 
 @torch.inference_mode()
-def evaluate(net: PolicyValueNet, split: Split, batch_size: int = 1024) -> dict[str, Any]:
+def evaluate(
+    net: PolicyValueNet,
+    split: Split,
+    batch_size: int = 1024,
+    weights: np.ndarray | None = None,
+) -> dict[str, Any]:
     """Held-out metrics: imitation accuracy and loss, value calibration, aux error."""
     net.eval()
     totals: dict[str, float] = {"policy": 0.0, "value": 0.0, "aux_hands": 0.0, "aux_points": 0.0}
@@ -90,7 +115,7 @@ def evaluate(net: PolicyValueNet, split: Split, batch_size: int = 1024) -> dict[
     seen = decided_seen = 0
     for at in range(0, len(split), batch_size):
         index = np.arange(at, min(at + batch_size, len(split)))
-        b = batch(split, index)
+        b = batch(split, index, weights)
         out = net(b["states"], b["actions"], b["mask"])
         parts = losses(out, b)
         n, decided = len(index), int((b["winner"] >= 0).sum())
@@ -134,6 +159,17 @@ def evaluate(net: PolicyValueNet, split: Split, batch_size: int = 1024) -> dict[
             int(t): (float(correct[split.teacher == t].mean()), int((split.teacher == t).sum()))
             for t in np.unique(split.teacher)
         },
+        "top1_by_searched": (
+            {}
+            if split.searched is None
+            else {
+                int(k): (
+                    float(correct[split.searched == k].mean()),
+                    int((split.searched == k).sum()),
+                )
+                for k in np.unique(split.searched)
+            }
+        ),
     }
 
 
@@ -165,7 +201,15 @@ def train(
     rng = np.random.default_rng(config["seed"])
     version = train_split.feature_version
     state_dim, action_dim = dims(version)
-    net = PolicyValueNet(NetConfig(version, state_dim, action_dim, **config["net"]))
+    if config.get("init"):
+        net, _ = load_checkpoint(REPO_ROOT / config["init"])
+        if net.config.feature_version != version:
+            raise ValueError(f"{config['init']} has features v{net.config.feature_version}")
+    else:
+        net = PolicyValueNet(NetConfig(version, state_dim, action_dim, **config["net"]))
+    weights = (
+        np.array(config["search_weights"], np.float32) if config.get("search_weights") else None
+    )
     optimizer = torch.optim.AdamW(
         net.parameters(), lr=config["lr"], weight_decay=config["weight_decay"]
     )
@@ -181,7 +225,7 @@ def train(
         net.train()
         sums: dict[str, float] = {}
         count = 0
-        for b in batches(train_split, config["batch_size"], rng):
+        for b in batches(train_split, config["batch_size"], rng, weights):
             parts = losses(net(b["states"], b["actions"], b["mask"]), b)
             total = (
                 parts["policy"]
@@ -196,7 +240,7 @@ def train(
             for key, value in parts.items():
                 sums[key] = sums.get(key, 0.0) + float(value.detach()) * n
             count += n
-        dev = evaluate(net, dev_split)
+        dev = evaluate(net, dev_split, weights=weights)
         row = {
             "epoch": epoch,
             "seconds": round(time.perf_counter() - started, 1),

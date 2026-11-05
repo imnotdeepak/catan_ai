@@ -34,6 +34,8 @@ from catan_ai.engine import CanonicalAction, EngineAdapter, IllegalActionError
 from catan_ai.models import PolicyAgent, PolicyValue
 from catan_ai.observations import PlayerObservation, Referee
 
+PLAIN, SEARCHED, SWITCHED = 0, 1, 2
+
 # Prompts the policy answers well enough alone, or whose rollouts would be mostly noise.
 QUIET_PROMPTS: Final = frozenset({"DECIDE_ACCEPTEES"})
 
@@ -113,7 +115,9 @@ class SearchAgent:
 
     `stats` counts decisions, searches, switches away from the policy's choice,
     rollouts, rollout decisions and failures (a world sampler or rollout error
-    falls back to the policy's choice).
+    falls back to the policy's choice). `last` says what happened at the most
+    recent decision: PLAIN, SEARCHED (kept the policy's choice) or SWITCHED;
+    distillation data records it (SRCH-031).
     """
 
     def __init__(
@@ -127,9 +131,11 @@ class SearchAgent:
         self._rng = random.Random(seed)
         self._seed = seed
         self._sampler: WorldSampler | None = None
+        self.last = PLAIN
 
     def decide(self, observation: PlayerObservation) -> CanonicalAction:
         self.stats["decisions"] += 1
+        self.last = PLAIN
         legal = observation.legal_actions
         if len(legal) == 1:
             return legal[0]
@@ -148,6 +154,8 @@ class SearchAgent:
         except Exception:
             self.stats["failures"] += 1
             choice = picks[0]
+        else:
+            self.last = SWITCHED if choice != picks[0] else SEARCHED
         self.search_seconds += time.perf_counter() - started
         return legal[choice]
 

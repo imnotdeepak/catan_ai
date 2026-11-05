@@ -6,11 +6,19 @@ from typing import Any
 
 import numpy as np
 import pytest
+import torch
 
+from catan_ai.models.encoding import dims
 from catan_ai.models.features import ACTION_KINDS
-from catan_ai.models.network import load_checkpoint
+from catan_ai.models.network import (
+    NetConfig,
+    PolicyValueNet,
+    is_outcome_parameter,
+    load_checkpoint,
+    save_checkpoint,
+)
 from catan_ai.training.dataset import build_dataset, game_specs, load_split
-from catan_ai.training.imitation import evaluate, train
+from catan_ai.training.imitation import batch, evaluate, train
 
 TEACHERS = ["catanatron:F"]
 LINEUP = ["catanatron:F", "catanatron:F", "catanatron:W", "catanatron:R"]
@@ -130,3 +138,39 @@ def test_reencoding_from_replays_reproduces_the_dataset(data_dir: Path, tmp_path
         original, rebuilt = load_split(data_dir, name), load_split(tmp_path, name)
         for field in ("states", "actions", "offsets", "label", "winner", "opponent_hands", "seat"):
             assert np.array_equal(getattr(original, field), getattr(rebuilt, field)), field
+
+
+def test_search_tags_and_weights(data_dir: Path) -> None:
+    split = load_split(data_dir, "train")
+    assert split.searched is not None and (split.searched == 0).all()  # no search teacher
+    split.searched = (np.arange(len(split)) % 3).astype(np.int8)
+    index = np.arange(12)
+    b = batch(split, index, np.array([1.0, 2.0, 0.0], np.float32))
+    assert b["weight"].tolist() == [1.0, 2.0, 0.0] * 4
+    assert batch(split, index)["weight"].tolist() == [1.0] * 12
+
+
+def test_distillation_fine_tunes_the_policy_tower_only(data_dir: Path, tmp_path: Path) -> None:
+    split = load_split(data_dir, "train")
+    start = PolicyValueNet(
+        NetConfig(split.feature_version, *dims(split.feature_version), hidden=32, layers=2)
+    )
+    save_checkpoint(tmp_path / "init.pt", start, {})
+    split.searched = (np.arange(len(split)) % 3).astype(np.int8)
+    settings = {
+        "seed": 0,
+        "init": str(tmp_path / "init.pt"),
+        "epochs": 1,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.0,
+        "value_weight": 0.0,
+        "aux_weight": 0.0,
+        "search_weights": [1.0, 1.0, 4.0],
+        "net": {},
+    }
+    net, _ = train(settings, split, load_split(data_dir, "dev"), tmp_path, {}, log=lambda _: None)
+    before, after = start.state_dict(), net.state_dict()
+    for name in before:
+        same = torch.equal(before[name], after[name])
+        assert same == (is_outcome_parameter(name) or name.startswith("aux_hands")), name

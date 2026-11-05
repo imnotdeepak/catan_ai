@@ -10,7 +10,10 @@ group's `keep` probability, seeded by match) we store:
 - privileged labels (`privileged.npz`): hidden facts at decision time
   (opponents' hands, true victory points). Training may use them as targets,
   never as inputs, and they live in their own file so that stays visible;
-- `meta.npz`: game, seat, turn and teacher of every sample.
+- `meta.npz`: game, seat, turn and teacher of every sample, and `searched`:
+  whether a search teacher (`catan_ai.search`) played the policy's choice
+  unsearched (0), searched and kept it (1), or searched and switched (2).
+  Datasets re-encoded from replays have no agents to ask, so record 0.
 
 Teachers read the full game, so some labels depend on hidden cards (plan §9.2,
 "Imitating privileged bots"); model inputs stay player-view regardless.
@@ -56,6 +59,7 @@ class _Recorder:
     keep: float
     rng: random.Random
     feature_version: int
+    agents: dict[int, Any] = field(default_factory=dict)  # our agents by seat (play_match sink)
     states: list[np.ndarray] = field(default_factory=list)
     actions: list[np.ndarray] = field(default_factory=list)
     labels: list[int] = field(default_factory=list)
@@ -63,6 +67,7 @@ class _Recorder:
     turns: list[int] = field(default_factory=list)
     hands: list[np.ndarray] = field(default_factory=list)
     points: list[np.ndarray] = field(default_factory=list)
+    searched: list[int] = field(default_factory=list)
 
     def __call__(self, seat: int, referee: Referee, action: CanonicalAction) -> None:
         if seat not in self.teacher_seats:
@@ -76,6 +81,7 @@ class _Recorder:
         self.labels.append(observation.legal_actions.index(action))
         self.seats.append(seat)
         self.turns.append(observation.num_turns)
+        self.searched.append(int(getattr(self.agents.get(seat), "last", 0)))
 
         ps = referee.adapter.referee_game.state.player_state
         order = [(seat + r) % NUM_SEATS for r in range(NUM_SEATS)]  # relative -> absolute
@@ -100,7 +106,11 @@ def _record_game(spec: GameSpec) -> dict[str, Any]:
     match_id, seed, seating, *_ = spec
     recorder = _recorder(spec)
     result, referee = play_match(
-        match_id, seed, [Contestant(n) for n in seating], observer=recorder
+        match_id,
+        seed,
+        [Contestant(n) for n in seating],
+        observer=recorder,
+        agent_sink=recorder.agents,
     )
     if result.error is not None:
         raise RuntimeError(f"{match_id}: {result.error}")
@@ -148,6 +158,7 @@ def _package(recorder: _Recorder, result: dict[str, Any]) -> dict[str, Any]:
         "seat": seats,
         "turn": np.array(recorder.turns, np.int16),
         "teacher": np.array([recorder.teacher_seats[s] for s in recorder.seats], np.int8),
+        "searched": np.array(recorder.searched, np.int8),
     }
 
 
@@ -234,6 +245,7 @@ def build_split(
             "seat": cat("seat"),
             "turn": cat("turn"),
             "teacher": cat("teacher"),
+            "searched": cat("searched"),
         },
     }
     split_dir = out_dir / name
@@ -322,6 +334,7 @@ class Split:
     teacher: np.ndarray
 
     feature_version: int = 1
+    searched: np.ndarray | None = None  # absent in datasets built before SRCH-031
 
     def __len__(self) -> int:
         return len(self.label)

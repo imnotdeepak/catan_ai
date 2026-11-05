@@ -1,0 +1,99 @@
+{
+  "description": "Search distillation (SRCH-031, plan §9.2 phase F): the champion with 4-world, 8-turn root search is the teacher, in self-play and with two ValueFunction bots; every teacher decision with a choice is kept, tagged by whether search ran and changed the move. Training fine-tunes the champion's policy tower only (value and auxiliary losses off, no weight decay), weighting the decisions search changed.",
+  "name": "distill-ppo3-4t8",
+  "dataset": {
+    "teachers": [
+      "search:4t8:model:champions/robber-ppo3-r60.pt"
+    ],
+    "splits": {
+      "train": {
+        "groups": [
+          {
+            "lineup": [
+              "search:4t8:model:champions/robber-ppo3-r60.pt",
+              "search:4t8:model:champions/robber-ppo3-r60.pt",
+              "search:4t8:model:champions/robber-ppo3-r60.pt",
+              "search:4t8:model:champions/robber-ppo3-r60.pt"
+            ],
+            "boards": 150,
+            "seed": 600000
+          },
+          {
+            "lineup": [
+              "search:4t8:model:champions/robber-ppo3-r60.pt",
+              "search:4t8:model:champions/robber-ppo3-r60.pt",
+              "catanatron:F",
+              "catanatron:F"
+            ],
+            "boards": 120,
+            "seed": 610000
+          }
+        ]
+      },
+      "dev": {
+        "groups": [
+          {
+            "lineup": [
+              "search:4t8:model:champions/robber-ppo3-r60.pt",
+              "search:4t8:model:champions/robber-ppo3-r60.pt",
+              "search:4t8:model:champions/robber-ppo3-r60.pt",
+              "search:4t8:model:champions/robber-ppo3-r60.pt"
+            ],
+            "boards": 20,
+            "seed": 620000
+          },
+          {
+            "lineup": [
+              "search:4t8:model:champions/robber-ppo3-r60.pt",
+              "search:4t8:model:champions/robber-ppo3-r60.pt",
+              "catanatron:F",
+              "catanatron:F"
+            ],
+            "boards": 15,
+            "seed": 630000
+          }
+        ]
+      },
+      "holdout": {
+        "groups": [
+          {
+            "lineup": [
+              "search:4t8:model:champions/robber-ppo3-r60.pt",
+              "search:4t8:model:champions/robber-ppo3-r60.pt",
+              "search:4t8:model:champions/robber-ppo3-r60.pt",
+              "search:4t8:model:champions/robber-ppo3-r60.pt"
+            ],
+            "boards": 20,
+            "seed": 640000
+          },
+          {
+            "lineup": [
+              "search:4t8:model:champions/robber-ppo3-r60.pt",
+              "search:4t8:model:champions/robber-ppo3-r60.pt",
+              "catanatron:F",
+              "catanatron:F"
+            ],
+            "boards": 15,
+            "seed": 650000
+          }
+        ]
+      }
+    }
+  },
+  "training": {
+    "seed": 0,
+    "init": "champions/robber-ppo3-r60.pt",
+    "epochs": 4,
+    "batch_size": 512,
+    "lr": 0.0001,
+    "weight_decay": 0.0,
+    "value_weight": 0.0,
+    "aux_weight": 0.0,
+    "search_weights": [
+      1.0,
+      1.0,
+      4.0
+    ],
+    "net": {}
+  }
+}
