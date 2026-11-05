@@ -1,0 +1,40 @@
+{
+  "description": "Release 0.6 (SRCH-030): root search 4t8 with the calibrated (imitation) value tower over the ppo-3 round-60 policy, on the Release 0.2/0.3 ladder tiers, same board seeds as reports/evaluation_0.5_ppo3.md.",
+  "model": "champions/robber-ppo3-r60-imitation-value.pt",
+  "tiers": [
+    {
+      "name": "weak",
+      "lineup": [
+        "search:4t8:model:champions/robber-ppo3-r60-imitation-value.pt",
+        "catanatron:W",
+        "catanatron:VP",
+        "catanatron:R"
+      ],
+      "boards": 100,
+      "seed": 400000
+    },
+    {
+      "name": "value-function",
+      "lineup": [
+        "search:4t8:model:champions/robber-ppo3-r60-imitation-value.pt",
+        "catanatron:F",
+        "catanatron:W",
+        "catanatron:VP"
+      ],
+      "boards": 100,
+      "seed": 410000
+    },
+    {
+      "name": "strong",
+      "lineup": [
+        "search:4t8:model:champions/robber-ppo3-r60-imitation-value.pt",
+        "catanatron:AB:2",
+        "catanatron:F",
+        "catanatron:W"
+      ],
+      "boards": 50,
+      "seed": 420000
+    }
+  ],
+  "title": "Release 0.6 Evaluation: calibrated root search (4t8) over robber-ppo3-r60"
+}
