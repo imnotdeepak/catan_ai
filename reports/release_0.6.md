@@ -76,6 +76,18 @@ Same tiers and board seeds as `evaluation_0.5_ppo3.md`; win rate per seat. `cata
 
 In the strong tier, search Robber spends 268 ms per decision on average, and AlphaBeta 118 ms. The strong tier is 200 games, so its interval is about ±7 points.
 
+### 1,000 games against AlphaBeta
+
+`evaluation_ab_search.md`: search 4×8 with the value-ppo3 tower in the strong tier (AB:2, F, W) on the 250 boards (seed 440000, four rotations) of the Release 0.5 AlphaBeta evaluation.
+
+| Bot | Search Robber's table | Plain `robber-ppo2-r60`'s table (`evaluation_ab.md`) |
+|---|---|---|
+| Robber | **48.3%** (45.2% to 51.4%) | 38.5% |
+| `catanatron:AB:2` | 27.0% | 33.4% |
+| `catanatron:F` | 24.7% | 28.0% |
+
+Against AlphaBeta directly, search Robber wins **64.1%** of the games either of them won (483 to 270; p < 1e-12), against plain Robber's 53.5% (p of about 0.06).
+
 ### Budget against strength (SRCH-031)
 
 The table below uses calibrated values and F opponents, with each budget playing the plain champion. Times are rough: 4 games per budget, timed in parallel processes (`runs/logs/time_budgets.py`). Report: `ablations/search-budget-cost.md`.
@@ -136,6 +148,6 @@ Both students played without search, against plain `robber-ppo3-r60`.
 ## Caveats
 
 - **Search is slow.** At 4 × 8 it spends about 250 ms per decision on average, against about 2 ms for plain play and about 118 ms for AlphaBeta. "Fixed compute" here means a fixed search budget compared with no search, plus budgets compared at equal cost. It is not a comparison against AlphaBeta at equal time.
-- **Few strong-tier games.** The strong-tier lead over AlphaBeta rests on 200 games; the 1.0 gate needs a larger AlphaBeta evaluation.
+- **AlphaBeta at depth 2 only.** The 1,000-game lead is over `catanatron:AB:2`; deeper AlphaBeta and the MCTS bots (`M`, `G`) are not yet tested.
 - **Distillation did not transfer search's strength.** Better targets would be the search's value estimates for each candidate rather than its single choice, or many more worlds per labelled position.
 - **Rollout opponents are the greedy policy.** Rollouts model every seat as Robber's own policy, never as the opponent model from Release 0.4.

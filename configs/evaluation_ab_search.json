@@ -1,0 +1,18 @@
+{
+  "title": "Search Robber vs AlphaBeta: large strong-tier evaluation (EVAL-032)",
+  "description": "The Release 0.6 search champion (4 worlds, 8 turns, value-ppo3 outcome tower over the robber-ppo3-r60 policy) in the strong tier with 250 boards, the same seeds (440000+) as reports/evaluation_ab.md.",
+  "model": "champions/robber-ppo3-r60-value-ppo3.pt",
+  "tiers": [
+    {
+      "name": "strong-large",
+      "lineup": [
+        "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+        "catanatron:AB:2",
+        "catanatron:F",
+        "catanatron:W"
+      ],
+      "boards": 250,
+      "seed": 440000
+    }
+  ]
+}
