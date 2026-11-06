@@ -1,0 +1,10 @@
+{
+  "description": "League for ppo-4 (Release 0.6 follow-up): weighted toward strong opponents so the learner often faces two or three of them, after search Robber only drew with AlphaBeta depth 2 at a table of three strong bots (reports/evaluation_deep_search.md). No weak bots; no trading wrapper.",
+  "fixed": {
+    "catanatron:AB:2": 0.35,
+    "catanatron:F": 0.25,
+    "model:champions/robber-ppo3-r60.pt": 0.15,
+    "model:champions/imitation-features-v3.pt": 0.05
+  },
+  "snapshot_weight": 0.20
+}
