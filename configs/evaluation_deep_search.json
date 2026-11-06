@@ -1,0 +1,19 @@
+{
+  "title": "Search Robber vs deeper and sampling-based search bots (EVAL-032)",
+  "description": "The Release 0.6 search champion against AlphaBeta at depth 3 (with depth 2 and ValueFunction at the same table), and against the MCTS and Greedy Playouts bots. Fresh board seeds.",
+  "model": "champions/robber-ppo3-r60-value-ppo3.pt",
+  "tiers": [
+    {
+      "name": "deep-alphabeta",
+      "lineup": ["search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt", "catanatron:AB:3", "catanatron:AB:2", "catanatron:F"],
+      "boards": 100,
+      "seed": 450000
+    },
+    {
+      "name": "sampling-search",
+      "lineup": ["search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt", "catanatron:M:50", "catanatron:G:10", "catanatron:F"],
+      "boards": 25,
+      "seed": 460000
+    }
+  ]
+}

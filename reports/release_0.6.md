@@ -148,6 +148,6 @@ Both students played without search, against plain `robber-ppo3-r60`.
 ## Caveats
 
 - **Search is slow.** At 4 × 8 it spends about 250 ms per decision on average, against about 2 ms for plain play and about 118 ms for AlphaBeta. "Fixed compute" here means a fixed search budget compared with no search, plus budgets compared at equal cost. It is not a comparison against AlphaBeta at equal time.
-- **AlphaBeta at depth 2 only.** The 1,000-game lead is over `catanatron:AB:2`; deeper AlphaBeta and the MCTS bots (`M`, `G`) are not yet tested.
+- **The lead over AlphaBeta depends on the table.** With three strong opponents (AB:3, AB:2, F; 400 games, `evaluation_deep_search.md`) search Robber is level with AB:2: 28.2% against 28.7% of games, 49.6% head to head. The strong-tier margin comes largely from a table whose fourth seat (W) never wins. Depth-3 AlphaBeta is weaker than depth 2 (21.8%); the MCTS and Greedy Playouts bots win 0% and 6%.
 - **Distillation did not transfer search's strength.** Better targets would be the search's value estimates for each candidate rather than its single choice, or many more worlds per labelled position.
 - **Rollout opponents are the greedy policy.** Rollouts model every seat as Robber's own policy, never as the opponent model from Release 0.4.
