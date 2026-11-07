@@ -117,7 +117,11 @@ class SearchAgent:
     rollouts, rollout decisions and failures (a world sampler or rollout error
     falls back to the policy's choice). `last` says what happened at the most
     recent decision: PLAIN, SEARCHED (kept the policy's choice) or SWITCHED;
-    distillation data records it (SRCH-031).
+    distillation data records it (SRCH-031). `last_priors` and `last_scores`
+    hold that decision's policy priors over the legal actions and the mean
+    rollout value of each searched candidate (legal index -> value), the
+    targets of expert iteration; both are empty when the policy was not asked
+    or nothing was searched.
     """
 
     def __init__(
@@ -132,10 +136,13 @@ class SearchAgent:
         self._seed = seed
         self._sampler: WorldSampler | None = None
         self.last = PLAIN
+        self.last_priors: tuple[float, ...] = ()
+        self.last_scores: dict[int, float] = {}
 
     def decide(self, observation: PlayerObservation) -> CanonicalAction:
         self.stats["decisions"] += 1
         self.last = PLAIN
+        self.last_priors, self.last_scores = (), {}
         legal = observation.legal_actions
         if len(legal) == 1:
             return legal[0]
@@ -145,17 +152,21 @@ class SearchAgent:
                 raise ValueError("unusable priors")
         except Exception:
             return self._plain.decide(observation)  # its heuristic fallback
+        self.last_priors = priors
         picks = should_search(observation, priors, self.config)
         if not picks:
             return legal[_argmax(priors)]
         started = time.perf_counter()
         try:
-            choice = self._search(observation, picks)
+            choice, means = self._search(observation, picks)
         except Exception:
             self.stats["failures"] += 1
             choice = picks[0]
         else:
             self.last = SWITCHED if choice != picks[0] else SEARCHED
+            self.last_scores = {
+                i: m for i, m in zip(picks, means, strict=True) if not math.isnan(m)
+            }
         self.search_seconds += time.perf_counter() - started
         return legal[choice]
 
@@ -188,7 +199,8 @@ class SearchAgent:
                 self.stats["rollout_decisions"] += played
         return [t / c if c else math.nan for t, c in zip(totals, counts, strict=True)]
 
-    def _search(self, observation: PlayerObservation, picks: list[int]) -> int:
+    def _search(self, observation: PlayerObservation, picks: list[int]) -> tuple[int, list[float]]:
+        """(chosen legal index, mean value of each candidate in `picks`)."""
         self.stats["searches"] += 1
         means = self.scores(observation, picks)
         base = means[0]
@@ -196,8 +208,8 @@ class SearchAgent:
         if math.isnan(base) or _finite(means[best]) - base > self.config.switch:
             if best != 0:
                 self.stats["switches"] += 1
-            return picks[best]
-        return picks[0]
+            return picks[best], means
+        return picks[0], means
 
 
 def _argmax(values: tuple[float, ...]) -> int:

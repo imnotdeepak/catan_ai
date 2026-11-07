@@ -12,6 +12,12 @@ loss of each sample weighted by `search_weights[searched]` (unsearched,
 searched and kept, searched and switched), so the decisions search changed
 count for more.
 
+Expert iteration (`policy_target: "search"`) replaces the teacher's single
+choice with a soft target built from the search's scores (`search_targets`):
+the teacher's prior, tilted toward the candidates whose rollouts scored
+higher, prior x exp((q - mean q) / `search_tau`). Decisions that were not
+searched keep the prior itself as their target.
+
 The saved checkpoint combines the policy tower from the epoch with the lowest
 dev policy loss and the outcome tower from the epoch with the lowest dev value
 loss (the towers share no weights; see models/network.py). Metrics are
@@ -45,9 +51,39 @@ from catan_ai.training.dataset import Split
 Batch = dict[str, torch.Tensor]
 
 
-def batch(split: Split, index: np.ndarray, weights: np.ndarray | None = None) -> Batch:
+def search_targets(
+    prior: np.ndarray, q: np.ndarray, mask: np.ndarray, label: np.ndarray, tau: float
+) -> np.ndarray:
+    """Soft policy targets over padded candidate rows (expert iteration).
+
+    prior x exp((q - mean scored q) / tau) over each sample's candidates, where
+    unscored candidates count as the mean; samples with no scores keep the
+    prior, and samples with no prior (non-search teachers) a one-hot label.
+    """
+    prior = np.where(mask, prior, np.nan)
+    scored = mask & np.isfinite(q)
+    count = scored.sum(1)
+    mean = np.where(scored, q, 0.0).sum(1) / np.maximum(count, 1)
+    tilt = np.where(scored, q, mean[:, None]) - mean[:, None]
+    logits = np.log(np.maximum(np.nan_to_num(prior, nan=0.0), 1e-6)) + tilt / tau
+    logits = np.where(mask, logits, -np.inf)
+    target = np.exp(logits - logits.max(1, keepdims=True))
+    target /= target.sum(1, keepdims=True)
+    has_prior = np.isfinite(prior).sum(1) == mask.sum(1)
+    one_hot = np.zeros_like(target)
+    one_hot[np.arange(len(label)), label] = 1.0
+    return np.where(has_prior[:, None], target, one_hot).astype(np.float32)
+
+
+def batch(
+    split: Split,
+    index: np.ndarray,
+    weights: np.ndarray | None = None,
+    tau: float | None = None,
+) -> Batch:
     """Gather samples, padding candidate sets to the largest in the batch. `weights`
-    are per-sample policy-loss weights by `searched` code (default all 1)."""
+    are per-sample policy-loss weights by `searched` code (default all 1). With
+    `tau`, the batch carries soft search targets (`search_targets`)."""
     start = split.offsets[index]
     counts = split.offsets[index + 1] - start
     width = int(counts.max())
@@ -59,7 +95,16 @@ def batch(split: Split, index: np.ndarray, weights: np.ndarray | None = None) ->
     weight = np.ones(len(index), np.float32)
     if weights is not None and split.searched is not None:
         weight = weights[split.searched[index]].astype(np.float32)
+    extra: Batch = {}
+    if tau is not None:
+        if split.search_prior is None or split.search_q is None:
+            raise ValueError("search targets need a dataset recorded with a search teacher")
+        prior = split.search_prior[rows].astype(np.float32)
+        q = split.search_q[rows].astype(np.float32)
+        label = split.label[index].astype(np.int64)
+        extra["target"] = torch.from_numpy(search_targets(prior, q, mask, label, tau))
     return {
+        **extra,
         "weight": torch.from_numpy(weight),
         "states": torch.from_numpy(split.states[index].astype(np.float32)),
         "actions": torch.from_numpy(actions),
@@ -76,10 +121,11 @@ def batches(
     size: int,
     rng: np.random.Generator | None = None,
     weights: np.ndarray | None = None,
+    tau: float | None = None,
 ) -> Iterator[Batch]:
     order = rng.permutation(len(split)) if rng is not None else np.arange(len(split))
     for at in range(0, len(order), size):
-        yield batch(split, order[at : at + size], weights)
+        yield batch(split, order[at : at + size], weights, tau)
 
 
 def losses(out: dict[str, torch.Tensor], b: Batch) -> dict[str, torch.Tensor]:
@@ -90,9 +136,13 @@ def losses(out: dict[str, torch.Tensor], b: Batch) -> dict[str, torch.Tensor]:
         if decided.any()
         else out["value_logits"].sum() * 0
     )
+    if "target" in b:
+        logp = torch.log_softmax(out["policy_logits"], 1)
+        per_sample = -torch.where(b["mask"], b["target"] * logp, torch.zeros_like(logp)).sum(1)
+    else:
+        per_sample = F.cross_entropy(out["policy_logits"], b["label"], reduction="none")
     return {
-        "policy": (F.cross_entropy(out["policy_logits"], b["label"], reduction="none") * w).sum()
-        / w.sum(),
+        "policy": (per_sample * w).sum() / w.sum(),
         "value": value,
         "aux_hands": F.mse_loss(out["aux_hands"], b["opponent_hands"] / 4),
         "aux_points": F.mse_loss(out["aux_points"], b["final_points"] / 10),
@@ -105,6 +155,7 @@ def evaluate(
     split: Split,
     batch_size: int = 1024,
     weights: np.ndarray | None = None,
+    tau: float | None = None,
 ) -> dict[str, Any]:
     """Held-out metrics: imitation accuracy and loss, value calibration, aux error."""
     net.eval()
@@ -115,7 +166,7 @@ def evaluate(
     seen = decided_seen = 0
     for at in range(0, len(split), batch_size):
         index = np.arange(at, min(at + batch_size, len(split)))
-        b = batch(split, index, weights)
+        b = batch(split, index, weights, tau)
         out = net(b["states"], b["actions"], b["mask"])
         parts = losses(out, b)
         n, decided = len(index), int((b["winner"] >= 0).sum())
@@ -189,6 +240,14 @@ def expected_calibration_error(p: np.ndarray, won: np.ndarray, bins: int = 10) -
     )
 
 
+def target_tau(config: dict[str, Any]) -> float | None:
+    """`search_tau` when the config trains on search targets, else None."""
+    target = config.get("policy_target", "label")
+    if target not in ("label", "search"):
+        raise ValueError(f"policy_target must be 'label' or 'search', not {target!r}")
+    return float(config["search_tau"]) if target == "search" else None
+
+
 def train(
     config: dict[str, Any],
     train_split: Split,
@@ -210,6 +269,7 @@ def train(
     weights = (
         np.array(config["search_weights"], np.float32) if config.get("search_weights") else None
     )
+    tau = target_tau(config)
     policy_weight = float(config.get("policy_weight", 1.0))
     # With the policy loss off, only the outcome tower trains (value recalibration, 0.6).
     trained = [p for n, p in net.named_parameters() if policy_weight or is_outcome_parameter(n)]
@@ -226,7 +286,7 @@ def train(
         net.train()
         sums: dict[str, float] = {}
         count = 0
-        for b in batches(train_split, config["batch_size"], rng, weights):
+        for b in batches(train_split, config["batch_size"], rng, weights, tau):
             parts = losses(net(b["states"], b["actions"], b["mask"]), b)
             total = (
                 policy_weight * parts["policy"]
@@ -241,7 +301,7 @@ def train(
             for key, value in parts.items():
                 sums[key] = sums.get(key, 0.0) + float(value.detach()) * n
             count += n
-        dev = evaluate(net, dev_split, weights=weights)
+        dev = evaluate(net, dev_split, weights=weights, tau=tau)
         row = {
             "epoch": epoch,
             "seconds": round(time.perf_counter() - started, 1),

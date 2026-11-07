@@ -1,6 +1,7 @@
 """Imitation dataset (ML-012) and training loop (ML-014) on a tiny dataset."""
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +19,7 @@ from catan_ai.models.network import (
     save_checkpoint,
 )
 from catan_ai.training.dataset import build_dataset, game_specs, load_split
-from catan_ai.training.imitation import batch, evaluate, train
+from catan_ai.training.imitation import batch, evaluate, search_targets, train
 
 TEACHERS = ["catanatron:F"]
 LINEUP = ["catanatron:F", "catanatron:F", "catanatron:W", "catanatron:R"]
@@ -198,3 +199,61 @@ def test_value_recalibration_trains_the_outcome_tower_only(data_dir: Path, tmp_p
     before, after = start.state_dict(), net.state_dict()
     changed = {name for name in before if not torch.equal(before[name], after[name])}
     assert changed and all(is_outcome_parameter(name) for name in changed)
+
+
+def test_search_targets_tilt_the_prior_toward_better_scores() -> None:
+    mask = np.array([[True, True, True], [True, True, False], [True, True, True]])
+    prior = np.array([[0.5, 0.3, 0.2], [0.6, 0.4, 0.0], [np.nan, np.nan, np.nan]], np.float32)
+    q = np.array(
+        [[0.40, 0.50, np.nan], [np.nan, np.nan, np.nan], [np.nan, np.nan, np.nan]], np.float32
+    )
+    target = search_targets(prior, q, mask, np.array([0, 0, 2]), tau=0.05)
+    assert np.allclose(target.sum(1), 1.0) and target[1, 2] == 0.0
+    assert target[0, 1] > target[0, 0]  # scored higher, overtakes the larger prior
+    # mean scored q 0.45: candidate 0 tilts by exp(-1), the unscored one by exp(0)
+    assert np.isclose((target[0, 2] / 0.2) / (target[0, 0] / 0.5), np.e, rtol=1e-4)
+    assert np.allclose(target[1, :2], [0.6, 0.4], atol=1e-5)  # nothing scored: the prior
+    assert target[2].tolist() == [0.0, 0.0, 1.0]  # no prior (non-search teacher): the label
+
+
+def test_expert_iteration_data_and_training(tmp_path: Path) -> None:
+    version = 3
+    net = PolicyValueNet(NetConfig(version, *dims(version), hidden=32, layers=2))
+    save_checkpoint(tmp_path / "tiny.pt", net, {})
+    teacher = f"search:1t1:model:{(tmp_path / 'tiny.pt').as_posix()}"
+    lineup = [teacher, "catanatron:F", "catanatron:F", "catanatron:F"]
+    settings = {
+        "teachers": [teacher],
+        "feature_version": version,
+        "splits": {
+            "train": {"groups": [{"lineup": lineup, "boards": 1, "seed": 31}]},
+            "dev": {"groups": [{"lineup": lineup, "boards": 1, "seed": 32}]},
+        },
+    }
+    build_dataset(settings, tmp_path / "data")
+    split = load_split(tmp_path / "data", "train")
+    assert split.search_prior is not None and split.search_q is not None
+    assert len(split.search_prior) == len(split.actions) == len(split.search_q)
+    assert np.isfinite(split.search_prior.astype(np.float32)).all()  # every sample a teacher's
+    scored = np.isfinite(split.search_q.astype(np.float32))
+    searched = np.repeat(split.searched > 0, np.diff(split.offsets))
+    assert scored.any() and not (scored & ~searched).any()  # scores only where search ran
+    b = batch(split, np.arange(len(split)), tau=0.05)
+    assert torch.allclose(b["target"].sum(1), torch.ones(len(split)))
+    train_settings = {
+        "seed": 0,
+        "init": str(tmp_path / "tiny.pt"),
+        "epochs": 1,
+        "batch_size": 64,
+        "lr": 0.001,
+        "weight_decay": 0.0,
+        "value_weight": 0.0,
+        "aux_weight": 0.0,
+        "policy_target": "search",
+        "search_tau": 0.05,
+        "net": {},
+    }
+    dev = load_split(tmp_path / "data", "dev")
+    trained, history = train(train_settings, split, dev, tmp_path / "out", {}, log=lambda _: None)
+    assert math.isfinite(history[0]["train_policy"]) and (tmp_path / "out" / "best.pt").exists()
+    assert trained is not None

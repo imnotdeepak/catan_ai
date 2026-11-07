@@ -14,6 +14,11 @@ group's `keep` probability, seeded by match) we store:
   whether a search teacher (`catan_ai.search`) played the policy's choice
   unsearched (0), searched and kept it (1), or searched and switched (2).
   Datasets re-encoded from replays have no agents to ask, so record 0.
+- search targets (in `labels.npz`, one value per candidate, aligned with the
+  candidate rows): `search_prior`, the teacher policy's prior, and `search_q`,
+  the search's mean rollout value for the candidates it scored (expert
+  iteration). Both are NaN where the teacher is not a search agent, and
+  `search_q` is NaN for candidates that were not scored.
 
 Teachers read the full game, so some labels depend on hidden cards (plan §9.2,
 "Imitating privileged bots"); model inputs stay player-view regardless.
@@ -68,6 +73,8 @@ class _Recorder:
     hands: list[np.ndarray] = field(default_factory=list)
     points: list[np.ndarray] = field(default_factory=list)
     searched: list[int] = field(default_factory=list)
+    priors: list[np.ndarray] = field(default_factory=list)
+    qs: list[np.ndarray] = field(default_factory=list)
 
     def __call__(self, seat: int, referee: Referee, action: CanonicalAction) -> None:
         if seat not in self.teacher_seats:
@@ -81,7 +88,18 @@ class _Recorder:
         self.labels.append(observation.legal_actions.index(action))
         self.seats.append(seat)
         self.turns.append(observation.num_turns)
-        self.searched.append(int(getattr(self.agents.get(seat), "last", 0)))
+        agent = self.agents.get(seat)
+        self.searched.append(int(getattr(agent, "last", 0)))
+        width = len(observation.legal_actions)
+        prior = np.full(width, np.nan, np.float32)
+        q = np.full(width, np.nan, np.float32)
+        last_priors = getattr(agent, "last_priors", ())
+        if len(last_priors) == width:
+            prior[:] = last_priors
+        for index, value in getattr(agent, "last_scores", {}).items():
+            q[index] = value
+        self.priors.append(prior)
+        self.qs.append(q)
 
         ps = referee.adapter.referee_game.state.player_state
         order = [(seat + r) % NUM_SEATS for r in range(NUM_SEATS)]  # relative -> absolute
@@ -146,6 +164,12 @@ def _package(recorder: _Recorder, result: dict[str, Any]) -> dict[str, Any]:
             np.concatenate(recorder.actions) if n else np.zeros((0, action_dim), np.float16)
         ),
         "counts": np.array([len(a) for a in recorder.actions], np.int32),
+        "search_prior": (np.concatenate(recorder.priors) if n else np.zeros(0, np.float32)).astype(
+            np.float16
+        ),
+        "search_q": (np.concatenate(recorder.qs) if n else np.zeros(0, np.float32)).astype(
+            np.float16
+        ),
         "label": np.array(recorder.labels, np.int16),
         "winner": winner,
         "final_points": np.stack([np.roll(final, -int(s)) for s in seats])
@@ -238,6 +262,8 @@ def build_split(
             "label": cat("label"),
             "winner": cat("winner"),
             "final_points": cat("final_points"),
+            "search_prior": cat("search_prior"),
+            "search_q": cat("search_q"),
         },
         "privileged": {"opponent_hands": cat("opponent_hands"), "points_now": cat("points_now")},
         "meta": {
@@ -335,6 +361,8 @@ class Split:
 
     feature_version: int = 1
     searched: np.ndarray | None = None  # absent in datasets built before SRCH-031
+    search_prior: np.ndarray | None = None  # per candidate; absent before expert iteration
+    search_q: np.ndarray | None = None
 
     def __len__(self) -> int:
         return len(self.label)

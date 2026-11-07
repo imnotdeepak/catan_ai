@@ -1,0 +1,126 @@
+{
+  "description": "Expert iteration, cycle 1 (Release 0.6 follow-up): the search champion (4 worlds, 8 turns, value-ppo3 tower over the ppo-3 policy) plays self-play, with two ValueFunction bots, and with AlphaBeta and ValueFunction. Every teacher decision with a choice is kept with the policy's priors and the search's mean rollout value per scored candidate. The policy tower is trained toward prior x exp((q - mean q) / tau); unsearched decisions keep the prior as target. Value and auxiliary losses off.",
+  "name": "expert-1",
+  "dataset": {
+    "teachers": [
+      "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt"
+    ],
+    "splits": {
+      "train": {
+        "groups": [
+          {
+            "lineup": [
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt"
+            ],
+            "boards": 100,
+            "seed": 870000
+          },
+          {
+            "lineup": [
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "catanatron:F",
+              "catanatron:F"
+            ],
+            "boards": 70,
+            "seed": 871000
+          },
+          {
+            "lineup": [
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "catanatron:AB:2",
+              "catanatron:F"
+            ],
+            "boards": 60,
+            "seed": 872000
+          }
+        ]
+      },
+      "dev": {
+        "groups": [
+          {
+            "lineup": [
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt"
+            ],
+            "boards": 12,
+            "seed": 880000
+          },
+          {
+            "lineup": [
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "catanatron:F",
+              "catanatron:F"
+            ],
+            "boards": 8,
+            "seed": 881000
+          },
+          {
+            "lineup": [
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "catanatron:AB:2",
+              "catanatron:F"
+            ],
+            "boards": 8,
+            "seed": 882000
+          }
+        ]
+      },
+      "holdout": {
+        "groups": [
+          {
+            "lineup": [
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt"
+            ],
+            "boards": 12,
+            "seed": 890000
+          },
+          {
+            "lineup": [
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "catanatron:F",
+              "catanatron:F"
+            ],
+            "boards": 8,
+            "seed": 891000
+          },
+          {
+            "lineup": [
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "search:4t8:model:champions/robber-ppo3-r60-value-ppo3.pt",
+              "catanatron:AB:2",
+              "catanatron:F"
+            ],
+            "boards": 8,
+            "seed": 892000
+          }
+        ]
+      }
+    }
+  },
+  "training": {
+    "seed": 0,
+    "init": "champions/robber-ppo3-r60-value-ppo3.pt",
+    "epochs": 4,
+    "batch_size": 512,
+    "lr": 0.0001,
+    "weight_decay": 0.0,
+    "value_weight": 0.0,
+    "aux_weight": 0.0,
+    "policy_target": "search",
+    "search_tau": 0.05,
+    "net": {}
+  }
+}

@@ -126,3 +126,20 @@ def test_search_agents_are_deterministic_and_legal() -> None:
         assert agent.stats["failures"] == 0
     assert choices[0] == choices[1] and choices[0]
     assert all(a.kind != ActionKind.OFFER_TRADE for a in choices[0])
+
+
+def test_search_agents_report_priors_and_candidate_scores() -> None:
+    agent = SearchAgent(POLICY, SMALL, seed="d")
+    checked = 0
+    for referee in searched_positions(13):
+        obs = referee.observe(referee.adapter.current_seat)
+        picks = should_search(obs, POLICY.evaluate(obs).priors, SMALL)
+        agent.decide(obs)
+        assert len(agent.last_priors) == len(obs.legal_actions)
+        assert agent.last_scores and set(agent.last_scores) <= set(picks)
+        assert all(0.0 <= v <= 1.0 for v in agent.last_scores.values())
+        checked += 1
+    assert checked >= 3
+    forced = replace(obs, legal_actions=obs.legal_actions[:1])
+    agent.decide(forced)
+    assert agent.last_priors == () and agent.last_scores == {}

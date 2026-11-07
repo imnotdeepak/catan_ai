@@ -17,7 +17,7 @@ from typing import Any
 from catan_ai.models.network import load_checkpoint
 from catan_ai.provenance import REPO_ROOT, provenance
 from catan_ai.training.dataset import load_split
-from catan_ai.training.imitation import evaluate, train
+from catan_ai.training.imitation import evaluate, target_tau, train
 
 
 def pct(x: float) -> str:
@@ -177,7 +177,7 @@ def main(argv: list[str] | None = None) -> int:
 
     checkpoint = args.out / "best.pt"
     net, saved = load_checkpoint(checkpoint)
-    holdout = evaluate(net, load_split(args.data, "holdout"))
+    holdout = evaluate(net, load_split(args.data, "holdout"), tau=target_tau(settings))
     (args.out / "holdout.json").write_text(json.dumps(holdout, indent=2), encoding="utf-8")
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(
